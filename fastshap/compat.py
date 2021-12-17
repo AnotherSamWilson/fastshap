@@ -38,8 +38,10 @@ import numpy as np
 def _assign_np(array, location, values):
     array[location] = values
 
+
 def _view_np(array, location):
     return array[location]
+
 
 def _concat_np(np_list, axis):
     if axis == 0:
@@ -48,8 +50,8 @@ def _concat_np(np_list, axis):
         return np.hstack(np_list)
 
 
-
 """Other"""
+
 
 def _to_numpy(x):
     if isinstance(x, pd_DataFrame):
@@ -57,6 +59,3 @@ def _to_numpy(x):
 
     else:
         return x
-
-
-

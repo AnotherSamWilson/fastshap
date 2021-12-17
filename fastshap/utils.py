@@ -20,11 +20,8 @@ def print_big_num(x):
 
 
 def consecutive_slices(data):
-    runs = np.split(
-        data,
-        np.where(np.diff(data) != 1)[0]+1
-    )
-    return[slice(min(run), max(run) + 1) for run in runs]
+    runs = np.split(data, np.where(np.diff(data) != 1)[0] + 1)
+    return [slice(min(run), max(run) + 1) for run in runs]
 
 
 def stratified_continuous_folds(y, nfold):
