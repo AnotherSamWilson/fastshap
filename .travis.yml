@@ -18,9 +18,8 @@ before_install:
   - pip install pytest-cov -U
   - pip install codecov -U
   - pip install pandas -U
-  - pip install seaborn -U
-  - pip install matplotlib -U
   - pip install scipy -U
+  - pip install lightgbm -U
 install:
   - travis_retry pip install -e .
 script: 
