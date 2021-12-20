@@ -42,19 +42,19 @@ class KernelExplainer:
         assert isinstance(background_preds, np.ndarray)
         assert background_preds.ndim <= 2, "Maximum 2 dimensional outputs supported"
         self.output_dim = 1 if background_preds.ndim == 1 else background_preds.shape[1]
+        self.return_type = background_preds.dtype
 
         if isinstance(background_data, pd_DataFrame):
             self.col_names = background_data.columns.tolist()
             self.dtypes = {col: background_data[col].dtype for col in self.col_names}
-            from .compat import _assign_pd, _view_pd, _concat_pd
 
+            from .compat import _assign_pd, _view_pd, _concat_pd
             self._assign = _assign_pd
             self._view = _view_pd
             self._concat = _concat_pd
 
         if isinstance(background_data, np.ndarray):
             from .compat import _assign_np, _view_np, _concat_np
-
             self._assign = _assign_np
             self._view = _view_np
             self._concat = _concat_np
@@ -156,7 +156,6 @@ class KernelExplainer:
         working_background_data = self.background_data[background_fold_to_use]
         background_preds = _ensure_2d_array(self.model(working_background_data))
         background_pred_mean = background_preds.mean(0)
-        return_type = background_preds.dtype
 
         # Do cursory glances at the background and new data
         if isinstance(data, pd_DataFrame):
@@ -177,7 +176,7 @@ class KernelExplainer:
         shap_values = np.empty(
             shape=(data.shape[0], data.shape[1] + 1, self.output_dim)
         ).astype(
-            return_type
+            self.return_type
         )  # +1 for expected value
 
         # Determine how many coalition sizes in the symmetric kernel are paired.
@@ -240,7 +239,7 @@ class KernelExplainer:
             outer_batch_length = len(outer_batch)
             masked_coalition_avg = np.empty(
                 shape=(num_total_coalitions_to_run, outer_batch_length, self.output_dim)
-            ).astype(return_type)
+            ).astype(self.return_type)
             mask_matrix = np.zeros(
                 shape=(num_total_coalitions_to_run, self.num_columns)
             ).astype("int8")
@@ -291,7 +290,7 @@ class KernelExplainer:
                     )
                     batch_data = self._view(data, (slice_absolute, slice(None)))
                     repeated_batch_data = np.repeat(
-                        _to_numpy(batch_data).astype(return_type),
+                        _to_numpy(batch_data).astype(self.return_type),
                         repeats=n_background_rows,
                         axis=0,
                     )
@@ -300,7 +299,7 @@ class KernelExplainer:
                     for coalition_i in range(choose_count):
                         # coalition_i = 0
                         masked_data = np.tile(
-                            _to_numpy(working_background_data).astype(return_type),
+                            _to_numpy(working_background_data).astype(self.return_type),
                             (inner_batch_size, 1),
                         )
 
@@ -465,6 +464,7 @@ class KernelExplainer:
         """
         Gives the maximum expanded array sizes that can be
         expected for different parameters. Use this function
+        and .get_theoretical_minimum_memory_requirements()
         to determine appropriate parameters for your machine.
 
         Parameters
@@ -484,6 +484,8 @@ class KernelExplainer:
 
         Returns
         -------
+
+        A length 3 tuple, each containing the sizes of the arrays.
 
         Arrays returned are, in order:
             1) Mask Matrix
@@ -534,3 +536,67 @@ class KernelExplainer:
         )
 
         return mask_matrix_size, linear_target_size, inner_model_eval_set_size
+
+
+    def get_theoretical_minimum_memory_requirements(
+            self,
+            outer_batch_size=100,
+            inner_batch_size=10,
+            n_coalition_sizes=3,
+            background_fold_to_use=None,
+    ):
+        """
+        Returns the expected size of each of the following major arrays in GB:
+
+            Mask Matrix (Global)
+            Linear Features (Outer Batch)
+            Model Eval Set (Inner Batch)
+
+
+        Parameters
+        ----------
+
+        outer_batch_size: int
+            See calculate_shap_values()
+
+        inner_batch_size: int
+            See calculate_shap_values()
+
+        n_coalition_sizes: int
+            See calculate_shap_values()
+
+        background_fold_to_use: int
+            See calculate_shap_values()
+
+
+        Returns
+        -------
+        A length 3 tuple, each containing the sizes of the arrays in GB.
+
+        Arrays returned are, in order:
+            1) Mask Matrix
+            2) Linear Target Size (outer batch)
+                Depends on outer_batch_size, n_coalition_sizes, output dimension
+            3) Model Evaluation Set Size (inner batch)
+                Depends on inner_batch_size, n_coalition_sizes
+
+        """
+
+
+        (
+            mask_matrix_size,
+            linear_target_size,
+            inner_model_eval_set_size
+        ) = self.get_theoretical_array_expansion_sizes(
+            outer_batch_size,
+            inner_batch_size,
+            n_coalition_sizes,
+            background_fold_to_use,
+        )
+
+        bytes_per_item = self.return_type.itemsize
+        mask_matrix_GB = np.dtype("int8").itemsize * (np.product(mask_matrix_size) / 1000000000)
+        linear_targets_GB = bytes_per_item * (np.product(linear_target_size) / 1000000000)
+        eval_set_GB = bytes_per_item * (np.product(inner_model_eval_set_size) / 1000000000)
+
+        return mask_matrix_GB, linear_targets_GB, eval_set_GB

@@ -19,7 +19,6 @@ lgbmodel = lgb.train(
     num_boost_round=10
 )
 model = lgbmodel.predict
-
 preds = model(data)
 
 
@@ -33,6 +32,21 @@ def test_pd_stratifying():
     )
     assert all(abs(preds - sv.sum(1)) < 0.00001)
     assert sv.shape == (150, 5)
+
+    aes = ke.get_theoretical_array_expansion_sizes(
+        outer_batch_size=100,
+        inner_batch_size=100,
+        n_coalition_sizes=2
+    )
+    assert aes == ((14, 4), (14, 100, 1), (15000, 4))
+
+    aegb = ke.get_theoretical_minimum_memory_requirements(
+        outer_batch_size=100,
+        inner_batch_size=100,
+        n_coalition_sizes=2
+    )
+    assert all(a < 0.001 for a in aegb)
+
 
     # Stratify and re-compute
     ke.stratify_background_set(5)

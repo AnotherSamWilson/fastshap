@@ -171,6 +171,29 @@ manageable on most machines. However, this number ***grows extremely
 quickly*** with the samples and number of columns. It is highly advised
 to determine a good batch scheme before running this process.
 
+Another way to determine optimal batch sizes is to use the function
+`.get_theoretical_minimum_memory_requirements()`. This returns a list of
+Gigabytes needed to build the arrays above:
+
+``` python
+# Combines our background data back into 1 DataFrame
+(
+    mask_matrix_GB, 
+    linear_target_GB, 
+    inner_model_eval_set_GB
+) = ke.get_theoretical_minimum_memory_requirements(
+    outer_batch_size=150,
+    inner_batch_size=150,
+    n_coalition_sizes=3,
+    background_fold_to_use=None,
+)
+
+total_GB_needed = mask_matrix_GB + linear_target_GB + inner_model_eval_set_GB
+print(f"We need {total_GB_needed} GB to calculate shap values with these batch sizes.")
+```
+
+    ## We need 0.000736856 GB to calculate shap values with these batch sizes.
+
 ### Specifying a Custom Linear Model
 
 Any linear model available from sklearn.linear\_model can be used to
