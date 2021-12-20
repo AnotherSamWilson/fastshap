@@ -112,9 +112,9 @@ This is a list of the large arrays and their maximum size:
 * Global  
   + Mask Matrix (`# Coalitions`, `# Columns`) dtype = `int8`
 * Outer Batch  
-  + Linear Targets (`Total Coalition Combinations`, `Outer Batch Size`) dtype = `adaptive`
+  + Linear Targets (`Total Coalition Combinations`, `Outer Batch Size`, `Output Dimension`) dtype = `adaptive`
 * Inner Batch  
-  + Model Evaluation Features (`Inner Batch Size`, `# background samples`) dtype = `adaptive`
+  + Model Evaluation Features (`Inner Batch Size`, `# Background Samples`) dtype = `adaptive`
 
 The `adaptive` datatypes of the arrays above will be matched to the data types of the `model` output. Therefore, if your model returns `float32`, these arrays will be stored as `float32`. The final, returned shap values will also be returned as the datatype returned by the model.
 

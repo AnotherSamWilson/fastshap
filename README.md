@@ -132,10 +132,10 @@ This is a list of the large arrays and their maximum size:
       - Mask Matrix (`# Coalitions`, `# Columns`) dtype = `int8`
   - Outer Batch
       - Linear Targets (`Total Coalition Combinations`, `Outer Batch
-        Size`) dtype = `adaptive`
+        Size`, `Output Dimension`) dtype = `adaptive`
   - Inner Batch
-      - Model Evaluation Features (`Inner Batch Size`, `# background
-        samples`) dtype = `adaptive`
+      - Model Evaluation Features (`Inner Batch Size`, `# Background
+        Samples`) dtype = `adaptive`
 
 The `adaptive` datatypes of the arrays above will be matched to the data
 types of the `model` output. Therefore, if your model returns `float32`,

@@ -37,7 +37,7 @@ def stratified_continuous_folds(y, nfold):
 
 def _ensure_2d_array(a):
     if a.ndim == 1:
-        return a.reshape(-1,1)
+        return a.reshape(-1, 1)
     else:
         return a
 

@@ -4,7 +4,12 @@ from itertools import combinations
 from datetime import datetime as dt
 from scipy.special import binom
 from sklearn.linear_model import LinearRegression
-from .utils import stratified_continuous_folds, consecutive_slices, Logger, _ensure_2d_array
+from .utils import (
+    stratified_continuous_folds,
+    consecutive_slices,
+    Logger,
+    _ensure_2d_array,
+)
 
 
 class KernelExplainer:
@@ -169,7 +174,9 @@ class KernelExplainer:
         ]
 
         data_preds = _ensure_2d_array(self.model(data))
-        shap_values = np.empty(shape=(data.shape[0], data.shape[1] + 1, self.output_dim)).astype(
+        shap_values = np.empty(
+            shape=(data.shape[0], data.shape[1] + 1, self.output_dim)
+        ).astype(
             return_type
         )  # +1 for expected value
 
@@ -360,7 +367,9 @@ class KernelExplainer:
                             coalition_loc[coalition_i], slice_relative
                         ] = (
                             self.model(masked_data)
-                            .reshape(inner_batch_size, n_background_rows, self.output_dim)
+                            .reshape(
+                                inner_batch_size, n_background_rows, self.output_dim
+                            )
                             .mean(axis=1)
                         )
                         if has_complement:
@@ -368,7 +377,9 @@ class KernelExplainer:
                                 coalition_c_loc[coalition_i], slice_relative
                             ] = (
                                 self.model(masked_data_complement)
-                                .reshape(inner_batch_size, n_background_rows, self.output_dim)
+                                .reshape(
+                                    inner_batch_size, n_background_rows, self.output_dim
+                                )
                                 .mean(axis=1)
                             )
                         self.func_eval_times.append((dt.now() - s))
@@ -387,15 +398,21 @@ class KernelExplainer:
                         - (
                             mask_matrix[:, -1]
                             * (
-                                data_preds[outer_batch[outer_batch_sample], output_dimension]
+                                data_preds[
+                                    outer_batch[outer_batch_sample], output_dimension
+                                ]
                                 - background_pred_mean[output_dimension]
                             )
                         )
                     )
                     linear_model.fit(
-                        X=linear_features, sample_weight=coalition_weights, y=linear_target
+                        X=linear_features,
+                        sample_weight=coalition_weights,
+                        y=linear_target,
                     )
-                    shap_values[outer_batch[outer_batch_sample], :-2, output_dimension] = linear_model.coef_
+                    shap_values[
+                        outer_batch[outer_batch_sample], :-2, output_dimension
+                    ] = linear_model.coef_
 
         shap_values[:, -2, :] = data_preds - (
             shap_values[:, :-2, :].sum(1) + background_pred_mean
@@ -431,7 +448,9 @@ class KernelExplainer:
         """
 
         self.background_data = self._concat(self.background_data, axis=0)
-        background_preds = _ensure_2d_array(self.model(self.background_data))[:,output_dim_to_stratify]
+        background_preds = _ensure_2d_array(self.model(self.background_data))[
+            :, output_dim_to_stratify
+        ]
         folds = stratified_continuous_folds(background_preds, n_splits)
         self.background_data = [self._view(self.background_data, f) for f in folds]
         self.n_splits = n_splits
@@ -507,7 +526,7 @@ class KernelExplainer:
         linear_target_size = (
             np.sum(total_coalitions_per_coalition_size),
             outer_batch_size,
-            self.output_dim
+            self.output_dim,
         )
         inner_model_eval_set_size = (
             inner_batch_size * self.background_data[background_fold_to_use].shape[0],
