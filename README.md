@@ -28,8 +28,7 @@ boosted trees.
 
 ### Installation
 
-This package can be installed using either pip or conda, through
-conda-forge:
+This package can be installed using pip:
 
 ``` bash
 # Using pip
@@ -196,3 +195,33 @@ print(sv_lasso[0,:])
     ## [-0.         -0.33797832 -0.         -0.14634971  5.84333333]
 
 The default model used is `sklearn.linear_model.LinearRegression`.
+
+### Multiclass Outputs
+
+If the model returns multiple outputs, the resulting shap values are
+returned as an array of size (`rows`, `columns + 1`, `outputs`).
+Therefore, to get the shap values for the effects on the second class,
+you need to slice the resulting shap values using `shap_values[:,:,1]`.
+Here is an example:
+
+``` python
+multi_features = pd.concat(load_iris(as_frame=True,return_X_y=True),axis=1)
+multi_features.rename({"target": "species"}, inplace=True, axis=1)
+target = multi_features.pop("species")
+
+dtrain = lgb.Dataset(data=multi_features, label=target)
+lgbmodel = lgb.train(
+    params={"seed": 1, "objective": "multiclass", "num_class": 3, "verbose": -1},
+    train_set=dtrain,
+    num_boost_round=10
+)
+model = lgbmodel.predict
+
+explainer_multi = fastshap.KernelExplainer(model, multi_features)
+shap_values_multi = explainer_multi.calculate_shap_values(multi_features, verbose=False)
+
+# To get the shap values for the second class:
+print(shap_values_multi[:,:,1].shape)
+```
+
+    ## (150, 5)
