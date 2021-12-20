@@ -4,14 +4,13 @@ from itertools import combinations
 from datetime import datetime as dt
 from scipy.special import binom
 from sklearn.linear_model import LinearRegression
-from .utils import stratified_continuous_folds, consecutive_slices, Logger
+from .utils import stratified_continuous_folds, consecutive_slices, Logger, _ensure_2d_array
 
 
 class KernelExplainer:
     def __init__(self, model, background_data):
         """
         The KernelExplainer is capable of calculating shap values for any arbitrary function.
-        Multi dimension outputs are not supported yet.
 
         Parameters
         ----------
@@ -34,6 +33,10 @@ class KernelExplainer:
         self.background_data = [background_data]
         self.num_columns = background_data.shape[1]
         self.n_splits = 0
+        background_preds = model(background_data)
+        assert isinstance(background_preds, np.ndarray)
+        assert background_preds.ndim <= 2, "Maximum 2 dimensional outputs supported"
+        self.output_dim = 1 if background_preds.ndim == 1 else background_preds.shape[1]
 
         if isinstance(background_data, pd_DataFrame):
             self.col_names = background_data.columns.tolist()
@@ -51,109 +54,6 @@ class KernelExplainer:
             self._view = _view_np
             self._concat = _concat_np
 
-    def stratify_background_set(self, n_splits=10):
-        """
-        Helper function that breaks up the background
-        set into folds stratified by the model output
-        on the background set. The larger n_splits,
-        the smaller each background set is.
-
-        Parameters
-        ----------
-
-        n_splits: int
-            The number split datasets created. Raise
-            this number to calculate shap values
-            faster, at the expense of integrating
-            over a smaller dataset.
-
-        """
-
-        self.background_data = self._concat(self.background_data, axis=0)
-        background_preds = self.model(self.background_data)
-        folds = stratified_continuous_folds(background_preds, n_splits)
-        self.background_data = [self._view(self.background_data, f) for f in folds]
-        self.n_splits = n_splits
-
-    def get_theoretical_array_expansion_sizes(
-        self,
-        outer_batch_size=100,
-        inner_batch_size=10,
-        n_coalition_sizes=3,
-        background_fold_to_use=None,
-    ):
-        """
-        Gives the maximum expanded array sizes that can be
-        expected for different parameters. Use this function
-        to determine appropriate parameters for your machine.
-
-        Parameters
-        ----------
-
-        outer_batch_size: int
-            See calculate_shap_values()
-
-        inner_batch_size: int
-            See calculate_shap_values()
-
-        n_coalition_sizes: int
-            See calculate_shap_values()
-
-        background_fold_to_use: int
-            See calculate_shap_values()
-
-        Returns
-        -------
-
-        Arrays returned are, in order:
-            1) Mask Matrix
-            2) Linear Target Size (outer batch)
-                Depends on outer_batch_size, n_coalition_sizes
-            3) Model Evaluation Set Size (inner batch)
-                Depends on inner_batch_size, n_coalition_sizes
-        """
-
-        if background_fold_to_use is not None:
-            assert (
-                background_fold_to_use < self.n_splits
-            ), f"There are only {self.n_splits} splits of the background dataset"
-        else:
-            background_fold_to_use = 0
-
-        n_choose_k_midpoint = (self.num_columns - 1) / 2.0
-        coalition_sizes_to_combinate = np.min(
-            [np.ceil(n_choose_k_midpoint), n_coalition_sizes]
-        ).astype("int32")
-        symmetric_sizes_to_combinate = np.min(
-            [np.floor(n_choose_k_midpoint), n_coalition_sizes]
-        ).astype("int32")
-        coalition_pared_ind = [
-            (cs in range(symmetric_sizes_to_combinate))
-            for cs in range(coalition_sizes_to_combinate)
-        ]
-
-        # Number of coalition combinations (including complement) per coalition size.
-        total_coalitions_per_coalition_size = [
-            binom(self.num_columns, i + 1).astype("int32")
-            * (2 if coalition_pared_ind[i] else 1)
-            for i in range(coalition_sizes_to_combinate)
-        ]
-
-        mask_matrix_size = (
-            np.sum(total_coalitions_per_coalition_size),
-            self.num_columns,
-        )
-        linear_target_size = (
-            np.sum(total_coalitions_per_coalition_size),
-            outer_batch_size,
-        )
-        inner_model_eval_set_size = (
-            inner_batch_size * self.background_data[background_fold_to_use].shape[0],
-            self.num_columns,
-        )
-
-        return mask_matrix_size, linear_target_size, inner_model_eval_set_size
-
     def calculate_shap_values(
         self,
         data,
@@ -161,8 +61,8 @@ class KernelExplainer:
         inner_batch_size=10,
         n_coalition_sizes=3,
         background_fold_to_use=None,
-        verbose=True,
         linear_model=None,
+        verbose=True,
     ):
         """
         Calculates approximate shap values for data.
@@ -208,14 +108,29 @@ class KernelExplainer:
             If the background dataset has been stratified, select one of
             them to use to calculate the shap values.
 
+        linear_model: sklearn.linear_model
+            The linear model used to obtain the shap values.
+            Must have a fit method. Intercept should not be fit.
+            See github page for examples.
+
         verbose: bool
             Should progress be printed?
+
 
         Returns
         -------
 
-        Returns an array of shape (# data rows, # columns + 1).
-        The last column is the expected value.
+        If the output is multiple dimensions (multiclass problems):
+            Returns a numpy array of shape (# data rows, # columns + 1, output dimension).
+            So, for example, if you would like to access the shap values for the second
+            class in a multi-class output, you can use the slice shap_values[:,:,1],
+            which will return an array of shape (# data rows, # columns + 1). The final
+            column is the expected value for that class.
+
+        If the output is a single dimension (binary, regression problems):
+            Returns a numpy array of shape (# data rows, # columns + 1). The final
+            column is the expected value for that class.
+
 
         """
 
@@ -234,8 +149,8 @@ class KernelExplainer:
             assert hasattr(linear_model, "fit")
 
         working_background_data = self.background_data[background_fold_to_use]
-        background_preds = self.model(working_background_data)
-        background_pred_mean = background_preds.mean()
+        background_preds = _ensure_2d_array(self.model(working_background_data))
+        background_pred_mean = background_preds.mean(0)
         return_type = background_preds.dtype
 
         # Do cursory glances at the background and new data
@@ -253,8 +168,8 @@ class KernelExplainer:
             for i in range(0, num_new_samples, outer_batch_size)
         ]
 
-        data_preds = self.model(data)
-        shap_values = np.empty(shape=(data.shape[0], data.shape[1] + 1)).astype(
+        data_preds = _ensure_2d_array(self.model(data))
+        shap_values = np.empty(shape=(data.shape[0], data.shape[1] + 1, self.output_dim)).astype(
             return_type
         )  # +1 for expected value
 
@@ -317,7 +232,7 @@ class KernelExplainer:
             logger.log(f"Starting Samples {outer_batch[0]} - {outer_batch[-1]}")
             outer_batch_length = len(outer_batch)
             masked_coalition_avg = np.empty(
-                shape=(num_total_coalitions_to_run, outer_batch_length)
+                shape=(num_total_coalitions_to_run, outer_batch_length, self.output_dim)
             ).astype(return_type)
             mask_matrix = np.zeros(
                 shape=(num_total_coalitions_to_run, self.num_columns)
@@ -445,7 +360,7 @@ class KernelExplainer:
                             coalition_loc[coalition_i], slice_relative
                         ] = (
                             self.model(masked_data)
-                            .reshape(inner_batch_size, n_background_rows)
+                            .reshape(inner_batch_size, n_background_rows, self.output_dim)
                             .mean(axis=1)
                         )
                         if has_complement:
@@ -453,36 +368,150 @@ class KernelExplainer:
                                 coalition_c_loc[coalition_i], slice_relative
                             ] = (
                                 self.model(masked_data_complement)
-                                .reshape(inner_batch_size, n_background_rows)
+                                .reshape(inner_batch_size, n_background_rows, self.output_dim)
                                 .mean(axis=1)
                             )
                         self.func_eval_times.append((dt.now() - s))
 
             # Back to outer batch
-            mean_model_output = data_preds.mean()
+            mean_model_output = data_preds.mean(0)
             linear_features = mask_matrix[:, :-1] - mask_matrix[:, -1].reshape(-1, 1)
 
             for outer_batch_sample in range(outer_batch_length):
-                linear_target = (
-                    masked_coalition_avg[:, outer_batch_sample]
-                    - mean_model_output
-                    - (
-                        mask_matrix[:, -1]
-                        * (
-                            data_preds[outer_batch[outer_batch_sample]]
-                            - background_pred_mean
+                # outer_batch_sample = 0
+                for output_dimension in range(self.output_dim):
+                    # output_dimension = 0
+                    linear_target = (
+                        masked_coalition_avg[:, outer_batch_sample, output_dimension]
+                        - mean_model_output[output_dimension]
+                        - (
+                            mask_matrix[:, -1]
+                            * (
+                                data_preds[outer_batch[outer_batch_sample], output_dimension]
+                                - background_pred_mean[output_dimension]
+                            )
                         )
                     )
-                )
-                # lr = LinearRegression(fit_intercept=False)
-                linear_model.fit(
-                    X=linear_features, sample_weight=coalition_weights, y=linear_target
-                )
-                shap_values[outer_batch[outer_batch_sample], :-2] = linear_model.coef_
+                    linear_model.fit(
+                        X=linear_features, sample_weight=coalition_weights, y=linear_target
+                    )
+                    shap_values[outer_batch[outer_batch_sample], :-2, output_dimension] = linear_model.coef_
 
-        shap_values[:, -2] = data_preds - (
-            shap_values[:, :-2].sum(1) + background_pred_mean
+        shap_values[:, -2, :] = data_preds - (
+            shap_values[:, :-2, :].sum(1) + background_pred_mean
         )
-        shap_values[:, -1] = background_pred_mean
+        shap_values[:, -1, :] = background_pred_mean
+
+        if self.output_dim == 1:
+            shap_values.resize(data.shape[0], data.shape[1] + 1)
 
         return shap_values
+
+    def stratify_background_set(self, n_splits=10, output_dim_to_stratify=0):
+        """
+        Helper function that breaks up the background
+        set into folds stratified by the model output
+        on the background set. The larger n_splits,
+        the smaller each background set is.
+
+        Parameters
+        ----------
+
+        n_splits: int
+            The number split datasets created. Raise
+            this number to calculate shap values
+            faster, at the expense of integrating
+            over a smaller dataset.
+
+        output_dim_to_stratify: int
+            If the model has multiple outputs, which
+            one should be used to stratify the
+            background set?
+
+        """
+
+        self.background_data = self._concat(self.background_data, axis=0)
+        background_preds = _ensure_2d_array(self.model(self.background_data))[:,output_dim_to_stratify]
+        folds = stratified_continuous_folds(background_preds, n_splits)
+        self.background_data = [self._view(self.background_data, f) for f in folds]
+        self.n_splits = n_splits
+
+    def get_theoretical_array_expansion_sizes(
+        self,
+        outer_batch_size=100,
+        inner_batch_size=10,
+        n_coalition_sizes=3,
+        background_fold_to_use=None,
+    ):
+        """
+        Gives the maximum expanded array sizes that can be
+        expected for different parameters. Use this function
+        to determine appropriate parameters for your machine.
+
+        Parameters
+        ----------
+
+        outer_batch_size: int
+            See calculate_shap_values()
+
+        inner_batch_size: int
+            See calculate_shap_values()
+
+        n_coalition_sizes: int
+            See calculate_shap_values()
+
+        background_fold_to_use: int
+            See calculate_shap_values()
+
+        Returns
+        -------
+
+        Arrays returned are, in order:
+            1) Mask Matrix
+            2) Linear Target Size (outer batch)
+                Depends on outer_batch_size, n_coalition_sizes, output dimension
+            3) Model Evaluation Set Size (inner batch)
+                Depends on inner_batch_size, n_coalition_sizes
+        """
+
+        if background_fold_to_use is not None:
+            assert (
+                background_fold_to_use < self.n_splits
+            ), f"There are only {self.n_splits} splits of the background dataset"
+        else:
+            background_fold_to_use = 0
+
+        n_choose_k_midpoint = (self.num_columns - 1) / 2.0
+        coalition_sizes_to_combinate = np.min(
+            [np.ceil(n_choose_k_midpoint), n_coalition_sizes]
+        ).astype("int32")
+        symmetric_sizes_to_combinate = np.min(
+            [np.floor(n_choose_k_midpoint), n_coalition_sizes]
+        ).astype("int32")
+        coalition_pared_ind = [
+            (cs in range(symmetric_sizes_to_combinate))
+            for cs in range(coalition_sizes_to_combinate)
+        ]
+
+        # Number of coalition combinations (including complement) per coalition size.
+        total_coalitions_per_coalition_size = [
+            binom(self.num_columns, i + 1).astype("int32")
+            * (2 if coalition_pared_ind[i] else 1)
+            for i in range(coalition_sizes_to_combinate)
+        ]
+
+        mask_matrix_size = (
+            np.sum(total_coalitions_per_coalition_size),
+            self.num_columns,
+        )
+        linear_target_size = (
+            np.sum(total_coalitions_per_coalition_size),
+            outer_batch_size,
+            self.output_dim
+        )
+        inner_model_eval_set_size = (
+            inner_batch_size * self.background_data[background_fold_to_use].shape[0],
+            self.num_columns,
+        )
+
+        return mask_matrix_size, linear_target_size, inner_model_eval_set_size

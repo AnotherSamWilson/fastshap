@@ -1,16 +1,25 @@
 
+[![Build
+Status](https://app.travis-ci.com/AnotherSamWilson/fastshap.svg?branch=main)](https://app.travis-ci.com/github/AnotherSamWilson/fastshap)
+[![CodeCov](https://codecov.io/gh/AnotherSamWilson/fastshap/branch/master/graphs/badge.svg?branch=master&service=github)](https://codecov.io/gh/AnotherSamWilson/fastshap)
+
 ## fastshap: A fast, approximate shap kernel
 
 <a href='https://github.com/AnotherSamWilson/miceforest'><img src='https://i.imgur.com/nbrAQso.png' align="right" height="300" /></a>
 
-`fastshap` was designed to be:
+Calculating shap values can take an extremely long time. `fastshap` was
+designed to be as fast as possible, using numpy. This is done by
+utilizing inner and outer batch assignments to keep the calculations
+inside vectorized operations as often as it can.
 
-  - **Fast** Calculating shap values can take an extremely long time.
-    `fastshap` utilizes inner and outer batch assignments to keep the
-    calculations inside vectorized operations as often as it can.
-  - **Used on Tabular Data** Can accept numpy arrays or pandas
-    DataFrames, and can handle categorical variables natively. As of
-    right now, only 1 dimensional outputs are accepted.
+A kernel explainer is ideal in situations where:
+
+1)  The model you are using does not have model-specific methods
+    available (for example, support vector machine)
+2)  You need to explain a modeling pipeline which includes variable
+    transformations.
+3)  You wish to explain the raw probabilities in a classification model,
+    instead of the log-odds.
 
 **WARNING** This package specifically offers a kernel explainer, which
 can calculate approximate shap values of f(X) towards y for any function

@@ -35,6 +35,13 @@ def stratified_continuous_folds(y, nfold):
     return val
 
 
+def _ensure_2d_array(a):
+    if a.ndim == 1:
+        return a.reshape(-1,1)
+    else:
+        return a
+
+
 class Logger:
     def __init__(self, verbose):
         self.verbose = verbose
