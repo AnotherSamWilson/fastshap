@@ -4,6 +4,8 @@ always_allow_html: true
 ---
 ```{r EDITPATH,include=FALSE}
 library(knitr)
+library(data.table)
+library(kableExtra)
 opts_chunk$set(engine.path = "C:/Users/swilson/virtual_environments/3.9.6/Scripts/python.exe")
 initlines = readLines(file("fastshap/__init__.py"))
 initlines = initlines[grep("__version__", initlines)]
@@ -15,20 +17,34 @@ vrzn = gsub("\"","",gsub("__version__ = ","",initlines))
 
 ## fastshap: A fast, approximate shap kernel
 
-<a href='https://github.com/AnotherSamWilson/miceforest'><img src='https://i.imgur.com/nbrAQso.png' align="right" height="300" /></a>
+<!-- <a href='https://github.com/AnotherSamWilson/miceforest'><img src='https://i.imgur.com/nbrAQso.png' align="right" height="300" /></a> -->
 
-Calculating shap values can take an extremely long time. `fastshap` was designed to be as fast as possible, using numpy. This is done by utilizing inner and outer batch assignments to keep the calculations inside vectorized operations as often as it can. 
+Calculating shap values can take an extremely long time. `fastshap` was designed to be as fast as possible by utilizing inner and outer batch assignments to keep the calculations inside vectorized operations as often as it can. This includes the model evaluation. If the model in question is more efficient for 100 samples than 10, then this sort of vectorization can have enormous benefits.
+
+**This package specifically offers a kernel explainer**. Kernel explainers can calculate approximate shap values of f(X) towards y for any function f. Much faster shap solutions are available specifically for gradient boosted trees and deep neural networks.
 
 A kernel explainer is ideal in situations where:  
 
 1) The model you are using does not have model-specific methods available (for example, support vector machine)
 2) You need to explain a modeling pipeline which includes variable transformations.
-3) You wish to explain the raw probabilities in a classification model, instead of the log-odds.
+3) The model has a link function or some other target transformation. For example, you wish to explain the raw probabilities in a classification model, instead of the log-odds.
 
 
-**WARNING**
-This package specifically offers a kernel explainer, which can calculate approximate shap values of f(X) towards y for any function f. Much faster shap solutions are available specifically for gradient boosted trees.
 
+
+### Features  
+Advantages of `fastshap`:  
+1) Fast. See benchmarks for comparisons. Speed increase is only limited by your RAM and the model calculation time.  
+2) Native handling of both numpy arrays and pandas dataframes including principled treatment of categories.  
+2) Easy built in stratification of background set.  
+3) Capable of plotting categorical variables in dependence plots.  
+4) Capable of determining categorical variable interactions in shap values.  
+5) Capable of plotting missing values in interaction variable.  
+
+Disadvantages of `fastshap`:  
+1) Only dependency plotting is supported as of now.  
+2) Does not support feature groups yet.  
+3) Does not support weights yet.  
 
 ### Installation
 This package can be installed using pip:
@@ -46,6 +62,44 @@ must first run ```conda install pip git```.
 $ pip install git+https://github.com/AnotherSamWilson/fastshap.git
 ```  
   
+  
+### Benchmarks  
+These benchmarks compare the `shap` package `KernelExplainer` to the one in `fastshap`. All code is in `./benchmarks`. We left out model-specific shap explainers, because they are usually orders of magnitued faster and more efficient than kernel explainers.
+
+##### Iris Dataset  
+The iris dataset is a table of 150 rows and 5 columns (4 features, one target). This benchmark measured the time to calculate the shap values for different row counts. The iris dataset was concatenated to itself to get the desired dataset size:  
+```{r,eval=TRUE,echo=FALSE,out.width="600px"}
+plot_df <- data.table::fread("benchmarks/iris_benchmark_time_df.csv")[,c(2,3,4,5,6,7)]
+plot_df[,c(2,3,4,5,6)] = round(plot_df[,c(2,3,4,5,6)], 2)
+names(plot_df) <- c("rows","fastshap", "shap", "fastshap", "shap", "Relative Difference")
+knitr::include_graphics("C:/Users/swilson/Projects/fastshap/benchmarks/iris_benchmark_time.png")
+plot_df %>%
+  kbl() %>%
+  kable_minimal() %>% 
+  # kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE) %>% 
+  add_header_above(c(" " = 1, "Avg Times" = 2, "StDev Times" = 2, " " = 1)) %>% 
+  landscape()
+``` 
+
+##### California Housing Dataset  
+The California Housing dataset is a table of 20640 rows and 9 columns (8 features, one target). This benchmark measured the time it took to calculate shap values on the first 2000 rows for different sizes of background datasets.  
+```{r,eval=TRUE,echo=FALSE,out.width="600px"}
+plot_df <- data.table::fread("benchmarks/cali_benchmark_time_df.csv")[,c(2,3,4,5)]
+plot_df[,c(2,3,4)] = round(plot_df[,c(2,3,4)], 2)
+knitr::include_graphics("C:/Users/swilson/Projects/fastshap/benchmarks/cali_benchmark_time.png")
+plot_df %>%
+  kbl() %>%
+  kable_minimal() %>% 
+  # kable_styling(latex_options = c("striped", "hold_position"), full_width = FALSE) %>% 
+  landscape()
+``` 
+
+
+##### Effect of Outer Batch Sizes  
+Increasing the outer batch size can have a significant effect on the run time of the process:  
+```{r,eval=TRUE,echo=FALSE,out.width="600px"}
+knitr::include_graphics("C:/Users/swilson/Projects/fastshap/benchmarks/batch_size_times.png")
+``` 
   
 ### Basic Usage  
 We will use the iris dataset for this example. Here, we load the data and train a simple lightgbm model on the dataset:
@@ -78,14 +132,42 @@ preds = model(data)
 We now have a `model` which takes a Pandas dataframe, and returns predictions. We can create an explainer that will use `data` as a background dataset to calculate the shap values of any dataset we wish:
 
 ``` {python KernelExplainer}
-import fastshap
+from fastshap import KernelExplainer
 
-ke = fastshap.KernelExplainer(model, data)
+ke = KernelExplainer(model, data)
 sv = ke.calculate_shap_values(data, verbose=False)
 
 print(all(preds == sv.sum(1)))
 ```
 
+### Plotting  
+Dependence plots can be created by passing the shap values and variable / interaction information to `plot_variable_effect_on_output`:  
+``` {python Plot1, eval=FALSE}
+from fastshap.plotting import plot_variable_effect_on_output
+plot_variable_effect_on_output(
+    sv, data,
+    variable="sepal width (cm)",
+    interaction_variable="auto"
+)
+```
+```{r,eval=TRUE,echo=FALSE,out.width="800px"}
+knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/depgraph.png")
+```  
+
+The type of plot that is generated depends on the model output, the variable type, and the interaction variable type. For example, plotting the effect of a categorical variable shows the following:
+``` {python Plot2, eval=FALSE}
+from fastshap.plotting import plot_variable_effect_on_output
+plot_variable_effect_on_output(
+    sv, data,
+    variable="species",
+    interaction_variable="auto"
+)
+```
+
+
+```{r,eval=TRUE,echo=FALSE,out.width="800px"}
+knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/depgraph_cat.png")
+```  
 
 ### Stratifying the Background Set
 We can select a subset of our data to act as a background set. By stratifying the background set on the results of the model output, we will usually get very similar results, while decreasing the caculation time drastically.
@@ -110,13 +192,13 @@ If the entire process was vectorized, it would require an array of size (`# Samp
 This is a list of the large arrays and their maximum size:  
 
 * Global  
-  + Mask Matrix (`# Coalitions`, `# Columns`) dtype = `int8`
+  + Mask Matrix (`# Coalitions`, `# Columns`)
 * Outer Batch  
-  + Linear Targets (`Total Coalition Combinations`, `Outer Batch Size`, `Output Dimension`) dtype = `adaptive`
+  + Linear Targets (`Total Coalition Combinations`, `Outer Batch Size`, `Output Dimension`)`
 * Inner Batch  
-  + Model Evaluation Features (`Inner Batch Size`, `# Background Samples`) dtype = `adaptive`
+  + Model Evaluation Features (`Inner Batch Size`, `# Background Samples`)`
 
-The `adaptive` datatypes of the arrays above will be matched to the data types of the `model` output. Therefore, if your model returns `float32`, these arrays will be stored as `float32`. The final, returned shap values will also be returned as the datatype returned by the model.
+The final, returned shap values will also be returned as the datatype returned by the model.
 
 These theoretical sizes can be calculated directly so that the user can determine appropriate batch sizes for their machine:
 ``` {python batch_size}
@@ -127,10 +209,11 @@ ke.stratify_background_set(1)
     linear_target_size, 
     inner_model_eval_set_size
 ) = ke.get_theoretical_array_expansion_sizes(
+    data=data,
     outer_batch_size=150,
     inner_batch_size=150,
     n_coalition_sizes=3,
-    background_fold_to_use=None,
+    background_fold_to_use=None
 )
 
 print(
@@ -148,10 +231,11 @@ Another way to determine optimal batch sizes is to use the function `.get_theore
     linear_target_GB, 
     inner_model_eval_set_GB
 ) = ke.get_theoretical_minimum_memory_requirements(
+    data=data,
     outer_batch_size=150,
     inner_batch_size=150,
     n_coalition_sizes=3,
-    background_fold_to_use=None,
+    background_fold_to_use=None
 )
 
 total_GB_needed = mask_matrix_GB + linear_target_GB + inner_model_eval_set_GB
@@ -196,10 +280,31 @@ lgbmodel = lgb.train(
 )
 model = lgbmodel.predict
 
-explainer_multi = fastshap.KernelExplainer(model, multi_features)
+explainer_multi = KernelExplainer(model, multi_features)
 shap_values_multi = explainer_multi.calculate_shap_values(multi_features, verbose=False)
 
 # To get the shap values for the second class:
-print(shap_values_multi[:,:,1].shape)
+print(shap_values_multi.shape)
 ```
+
+Our shap values are a numpy array of shape `(150, 5, 3)` for each of our 150 rows, 4 columns (plus expected value), and our 3 output dimensions. When plotting multiclass outputs, the classes are essentially treated as a categorical variable. However, it is possible to plot variable interactions with _one_ of the output classes, see below.  
+We can plot a variables shap values for each of the output classes:  
+``` {python PlotMulti, eval=FALSE}
+plot_variable_effect_on_output(
+    shap_values_multi,
+    data,
+    variable=2
+)
+```
+```{r,eval=TRUE,echo=FALSE,out.width="800px"}
+knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/multiclass_depgraph.png")
+```  
+
+We can also look at interactions if we are interested in a specific class. For instance, if we wanted to know the effect that `sepal width (cm)` had on our first class, we could do:
+``` {python PlotMulti2, eval=FALSE}
+plot_variable_effect_on_output(sv, data, variable="sepal width (cm)", output_index=0)
+```
+```{r,eval=TRUE,echo=FALSE,out.width="800px"}
+knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/mc_so_depgraph.png")
+```  
 
