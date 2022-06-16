@@ -31,21 +31,22 @@ A kernel explainer is ideal in situations where:
 
 ### Features
 
-Advantages of `fastshap`:  
-1\) Fast. See benchmarks for comparisons. Speed increase is only limited
-by your RAM and the model calculation time.  
-2\) Native handling of both numpy arrays and pandas dataframes including
-principled treatment of categories.  
-2\) Easy built in stratification of background set.  
-3\) Capable of plotting categorical variables in dependence plots.  
-4\) Capable of determining categorical variable interactions in shap
-values.  
-5\) Capable of plotting missing values in interaction variable.
+Advantages of `fastshap`:
 
-Disadvantages of `fastshap`:  
-1\) Only dependency plotting is supported as of now.  
-2\) Does not support feature groups yet.  
-3\) Does not support weights yet.
+  - Fast. See benchmarks for comparisons.  
+  - Native handling of both numpy arrays and pandas dataframes including
+    principled treatment of categories.  
+  - Easy built in stratification of background set.  
+  - Capable of plotting categorical variables in dependence plots.  
+  - Capable of determining categorical variable interactions in shap
+    values.  
+  - Capable of plotting missing values in interaction variable.
+
+Disadvantages of `fastshap`:
+
+  - Only dependency plotting is supported as of now.  
+  - Does not support feature groups yet.  
+  - Does not support weights yet.
 
 ### Installation
 
@@ -77,7 +78,7 @@ The iris dataset is a table of 150 rows and 5 columns (4 features, one
 target). This benchmark measured the time to calculate the shap values
 for different row counts. The iris dataset was concatenated to itself to
 get the desired dataset size:  
-<img src="C:/Users/swilson/Projects/fastshap/benchmarks/iris_benchmark_time.png" width="600px" />
+<img src="https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/benchmarks/iris_benchmark_time.png" width="600px" />
 
 <table class=" lightable-minimal" style='font-family: "Trebuchet MS", verdana, sans-serif; margin-left: auto; margin-right: auto;'>
 
@@ -367,9 +368,9 @@ Relative Difference
 
 The California Housing dataset is a table of 20640 rows and 9 columns (8
 features, one target). This benchmark measured the time it took to
-calculate shap values on the first 2000 rows for different sizes of
-background datasets.  
-<img src="C:/Users/swilson/Projects/fastshap/benchmarks/cali_benchmark_time.png" width="600px" />
+calculate shap values on the first 2000 rows for different sizes of the
+background dataset.  
+<img src="https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/benchmarks/cali_benchmark_time.png" width="600px" />
 
 <table class=" lightable-minimal" style='font-family: "Trebuchet MS", verdana, sans-serif; margin-left: auto; margin-right: auto;'>
 
@@ -417,19 +418,19 @@ Relative Difference
 
 <td style="text-align:right;">
 
-14.87
+14.61
 
 </td>
 
 <td style="text-align:right;">
 
-156.72
+128.48
 
 </td>
 
 <td style="text-align:right;">
 
-10.54
+8.79
 
 </td>
 
@@ -445,19 +446,19 @@ Relative Difference
 
 <td style="text-align:right;">
 
-17.84
+19.33
 
 </td>
 
 <td style="text-align:right;">
 
-190.48
+156.86
 
 </td>
 
 <td style="text-align:right;">
 
-10.67
+8.12
 
 </td>
 
@@ -473,19 +474,19 @@ Relative Difference
 
 <td style="text-align:right;">
 
-22.96
+24.79
 
 </td>
 
 <td style="text-align:right;">
 
-246.31
+203.43
 
 </td>
 
 <td style="text-align:right;">
 
-10.73
+8.21
 
 </td>
 
@@ -501,19 +502,19 @@ Relative Difference
 
 <td style="text-align:right;">
 
-33.90
+38.32
 
 </td>
 
 <td style="text-align:right;">
 
-340.98
+290.76
 
 </td>
 
 <td style="text-align:right;">
 
-10.06
+7.59
 
 </td>
 
@@ -529,19 +530,19 @@ Relative Difference
 
 <td style="text-align:right;">
 
-66.47
+72.80
 
 </td>
 
 <td style="text-align:right;">
 
-615.96
+515.27
 
 </td>
 
 <td style="text-align:right;">
 
-9.27
+7.08
 
 </td>
 
@@ -557,19 +558,19 @@ Relative Difference
 
 <td style="text-align:right;">
 
-134.47
+146.65
 
 </td>
 
 <td style="text-align:right;">
 
-1180.91
+979.44
 
 </td>
 
 <td style="text-align:right;">
 
-8.78
+6.68
 
 </td>
 
@@ -585,19 +586,19 @@ Relative Difference
 
 <td style="text-align:right;">
 
-263.76
+313.18
 
 </td>
 
 <td style="text-align:right;">
 
-2267.37
+1903.28
 
 </td>
 
 <td style="text-align:right;">
 
-8.60
+6.08
 
 </td>
 
@@ -611,7 +612,7 @@ Relative Difference
 
 Increasing the outer batch size can have a significant effect on the run
 time of the process:  
-<img src="C:/Users/swilson/Projects/fastshap/benchmarks/batch_size_times.png" width="600px" />
+<img src="https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/benchmarks/batch_size_times.png" width="600px" />
 
 ### Basic Usage
 
@@ -673,7 +674,7 @@ plot_variable_effect_on_output(
 )
 ```
 
-<img src="C:/Users/swilson/Projects/fastshap/graphics/depgraph.png" width="800px" />
+<img src="https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/depgraph.png" width="800px" />
 
 The type of plot that is generated depends on the model output, the
 variable type, and the interaction variable type. For example, plotting
@@ -688,7 +689,7 @@ plot_variable_effect_on_output(
 )
 ```
 
-<img src="C:/Users/swilson/Projects/fastshap/graphics/depgraph_cat.png" width="800px" />
+<img src="https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/depgraph_cat.png" width="800px" />
 
 ### Stratifying the Background Set
 
@@ -865,7 +866,7 @@ plot_variable_effect_on_output(
 )
 ```
 
-<img src="C:/Users/swilson/Projects/fastshap/graphics/multiclass_depgraph.png" width="800px" />
+<img src="https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/multiclass_depgraph.png" width="800px" />
 
 We can also look at interactions if we are interested in a specific
 class. For instance, if we wanted to know the effect that `sepal width
@@ -875,4 +876,4 @@ class. For instance, if we wanted to know the effect that `sepal width
 plot_variable_effect_on_output(sv, data, variable="sepal width (cm)", output_index=0)
 ```
 
-<img src="C:/Users/swilson/Projects/fastshap/graphics/mc_so_depgraph.png" width="800px" />
+<img src="https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/mc_so_depgraph.png" width="800px" />

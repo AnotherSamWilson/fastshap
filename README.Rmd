@@ -30,21 +30,21 @@ A kernel explainer is ideal in situations where:
 3) The model has a link function or some other target transformation. For example, you wish to explain the raw probabilities in a classification model, instead of the log-odds.
 
 
-
-
 ### Features  
 Advantages of `fastshap`:  
-1) Fast. See benchmarks for comparisons. Speed increase is only limited by your RAM and the model calculation time.  
-2) Native handling of both numpy arrays and pandas dataframes including principled treatment of categories.  
-2) Easy built in stratification of background set.  
-3) Capable of plotting categorical variables in dependence plots.  
-4) Capable of determining categorical variable interactions in shap values.  
-5) Capable of plotting missing values in interaction variable.  
+
+* Fast. See benchmarks for comparisons.  
+* Native handling of both numpy arrays and pandas dataframes including principled treatment of categories.  
+* Easy built in stratification of background set.  
+* Capable of plotting categorical variables in dependence plots.  
+* Capable of determining categorical variable interactions in shap values.  
+* Capable of plotting missing values in interaction variable.  
 
 Disadvantages of `fastshap`:  
-1) Only dependency plotting is supported as of now.  
-2) Does not support feature groups yet.  
-3) Does not support weights yet.  
+
+* Only dependency plotting is supported as of now.  
+* Does not support feature groups yet.  
+* Does not support weights yet.  
 
 ### Installation
 This package can be installed using pip:
@@ -72,7 +72,7 @@ The iris dataset is a table of 150 rows and 5 columns (4 features, one target). 
 plot_df <- data.table::fread("benchmarks/iris_benchmark_time_df.csv")[,c(2,3,4,5,6,7)]
 plot_df[,c(2,3,4,5,6)] = round(plot_df[,c(2,3,4,5,6)], 2)
 names(plot_df) <- c("rows","fastshap", "shap", "fastshap", "shap", "Relative Difference")
-knitr::include_graphics("C:/Users/swilson/Projects/fastshap/benchmarks/iris_benchmark_time.png")
+knitr::include_graphics("https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/benchmarks/iris_benchmark_time.png")
 plot_df %>%
   kbl() %>%
   kable_minimal() %>% 
@@ -82,11 +82,11 @@ plot_df %>%
 ``` 
 
 ##### California Housing Dataset  
-The California Housing dataset is a table of 20640 rows and 9 columns (8 features, one target). This benchmark measured the time it took to calculate shap values on the first 2000 rows for different sizes of background datasets.  
+The California Housing dataset is a table of 20640 rows and 9 columns (8 features, one target). This benchmark measured the time it took to calculate shap values on the first 2000 rows for different sizes of the background dataset.  
 ```{r,eval=TRUE,echo=FALSE,out.width="600px"}
 plot_df <- data.table::fread("benchmarks/cali_benchmark_time_df.csv")[,c(2,3,4,5)]
 plot_df[,c(2,3,4)] = round(plot_df[,c(2,3,4)], 2)
-knitr::include_graphics("C:/Users/swilson/Projects/fastshap/benchmarks/cali_benchmark_time.png")
+knitr::include_graphics("https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/benchmarks/cali_benchmark_time.png")
 plot_df %>%
   kbl() %>%
   kable_minimal() %>% 
@@ -98,7 +98,7 @@ plot_df %>%
 ##### Effect of Outer Batch Sizes  
 Increasing the outer batch size can have a significant effect on the run time of the process:  
 ```{r,eval=TRUE,echo=FALSE,out.width="600px"}
-knitr::include_graphics("C:/Users/swilson/Projects/fastshap/benchmarks/batch_size_times.png")
+knitr::include_graphics("https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/benchmarks/batch_size_times.png")
 ``` 
   
 ### Basic Usage  
@@ -151,7 +151,7 @@ plot_variable_effect_on_output(
 )
 ```
 ```{r,eval=TRUE,echo=FALSE,out.width="800px"}
-knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/depgraph.png")
+knitr::include_graphics("https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/depgraph.png")
 ```  
 
 The type of plot that is generated depends on the model output, the variable type, and the interaction variable type. For example, plotting the effect of a categorical variable shows the following:
@@ -166,7 +166,7 @@ plot_variable_effect_on_output(
 
 
 ```{r,eval=TRUE,echo=FALSE,out.width="800px"}
-knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/depgraph_cat.png")
+knitr::include_graphics("https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/depgraph_cat.png")
 ```  
 
 ### Stratifying the Background Set
@@ -297,7 +297,7 @@ plot_variable_effect_on_output(
 )
 ```
 ```{r,eval=TRUE,echo=FALSE,out.width="800px"}
-knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/multiclass_depgraph.png")
+knitr::include_graphics("https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/multiclass_depgraph.png")
 ```  
 
 We can also look at interactions if we are interested in a specific class. For instance, if we wanted to know the effect that `sepal width (cm)` had on our first class, we could do:
@@ -305,6 +305,6 @@ We can also look at interactions if we are interested in a specific class. For i
 plot_variable_effect_on_output(sv, data, variable="sepal width (cm)", output_index=0)
 ```
 ```{r,eval=TRUE,echo=FALSE,out.width="800px"}
-knitr::include_graphics("C:/Users/swilson/Projects/fastshap/graphics/mc_so_depgraph.png")
+knitr::include_graphics("https://raw.githubusercontent.com/AnotherSamWilson/fastshap/master/graphics/mc_so_depgraph.png")
 ```  
 
