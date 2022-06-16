@@ -6,18 +6,14 @@ try:
     from pandas import Series as pd_Series
     from pandas import concat
 
-
     def _assign_pd(table, location, values):
         table.iloc[location] = values
-
 
     def _view_pd(table, location):
         return table.iloc[location]
 
-
     def _concat_pd(pd_list, axis):
         return concat(pd_list, axis=axis)
-
 
     PANDAS_INSTALLED = True
 
@@ -56,6 +52,7 @@ def _concat_np(np_list, axis):
 
 """Other"""
 
+
 def _to_numpy(x):
     if isinstance(x, np.ndarray):
         return x
@@ -82,7 +79,7 @@ def _repeat(x, repeats, axis=0):
 
 def _tile(x, reps):
     if isinstance(x, pd_DataFrame) or isinstance(x, pd_Series):
-        new_ind = np.tile(np.arange(x.shape[0]),reps[0])
+        new_ind = np.tile(np.arange(x.shape[0]), reps[0])
         return x.iloc[new_ind].reset_index(drop=True)
     else:
         return np.tile(x, reps)

@@ -40,7 +40,9 @@ def _get_variable_name_index(variable, data):
             variable_index = variable
 
     elif isinstance(data, np.ndarray):
-        assert isinstance(variable, int), "data was numpy array, variable must be an integer"
+        assert isinstance(
+            variable, int
+        ), "data was numpy array, variable must be an integer"
         variable_name = str(variable)
         variable_index = variable
     else:
@@ -66,7 +68,9 @@ def _ensure_2d_array(a):
 
 
 def _fill_missing_cat(x, s):
-    assert isinstance(x, pd_Series), "Can only fill cat on pandas object or categorical series"
+    assert isinstance(
+        x, pd_Series
+    ), "Can only fill cat on pandas object or categorical series"
     x_nan = x.isnull()
     if x_nan.sum() > 0:
         if x.dtype.name == "category":

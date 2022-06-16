@@ -48,12 +48,14 @@ class KernelExplainer:
             self.dtypes = {col: background_data[col].dtype for col in self.col_names}
 
             from .compat import _assign_pd, _view_pd, _concat_pd
+
             self._assign = _assign_pd
             self._view = _view_pd
             self._concat = _concat_pd
 
         if isinstance(background_data, np.ndarray):
             from .compat import _assign_np, _view_np, _concat_np
+
             self._assign = _assign_np
             self._view = _view_np
             self._concat = _concat_np
@@ -168,7 +170,7 @@ class KernelExplainer:
         outer_batch_size, inner_batch_size = self._configure_batch_sizes(
             outer_batch_size=outer_batch_size,
             inner_batch_size=inner_batch_size,
-            data=data
+            data=data,
         )
         index = np.arange(num_new_samples)
         outer_batches = [
@@ -260,7 +262,9 @@ class KernelExplainer:
                 has_complement = coalition_size <= symmetric_sizes_to_combinate
                 choose_count = binom(self.num_columns, coalition_size).astype("int32")
                 model_evals = inner_batch_count * (choose_count * 2 + inner_batch_count)
-                logger.log(f"Coalition Size: {str(coalition_size)} - Model Evaluations: {model_evals}")
+                logger.log(
+                    f"Coalition Size: {str(coalition_size)} - Model Evaluations: {model_evals}"
+                )
                 inds = combinations(np.arange(self.num_columns), coalition_size)
                 listinds = [list(i) for i in inds]
                 coalition_weight = (
@@ -293,7 +297,7 @@ class KernelExplainer:
                     repeated_batch_data = _repeat(
                         self._view(data, (slice_absolute, slice(None))),
                         repeats=n_background_rows,
-                        axis=0
+                        axis=0,
                     )
 
                     # For each mask (and complement, if it is paired)
@@ -321,7 +325,7 @@ class KernelExplainer:
                             self._assign(
                                 masked_data,
                                 (slice(None), ms),
-                                self._view(repeated_batch_data, (slice(None), ms))
+                                self._view(repeated_batch_data, (slice(None), ms)),
                             )
 
                         if has_complement:
@@ -329,7 +333,7 @@ class KernelExplainer:
                                 self._assign(
                                     masked_data_complement,
                                     (slice(None), msc),
-                                    self._view(repeated_batch_data, (slice(None), msc))
+                                    self._view(repeated_batch_data, (slice(None), msc)),
                                 )
 
                         masked_coalition_avg[
@@ -396,17 +400,16 @@ class KernelExplainer:
 
         return shap_values
 
-    def _configure_batch_sizes(
-            self,
-            outer_batch_size,
-            inner_batch_size,
-            data
-    ):
+    def _configure_batch_sizes(self, outer_batch_size, inner_batch_size, data):
         n_rows = data.shape[0]
         outer_batch_size = n_rows if outer_batch_size is None else outer_batch_size
         outer_batch_size = n_rows if outer_batch_size > n_rows else outer_batch_size
-        inner_batch_size = outer_batch_size if inner_batch_size is None else inner_batch_size
-        assert inner_batch_size <= outer_batch_size, "outer batch size < inner batch size"
+        inner_batch_size = (
+            outer_batch_size if inner_batch_size is None else inner_batch_size
+        )
+        assert (
+            inner_batch_size <= outer_batch_size
+        ), "outer batch size < inner batch size"
         return outer_batch_size, inner_batch_size
 
     def stratify_background_set(self, n_splits=10, output_dim_to_stratify=0):
@@ -492,7 +495,7 @@ class KernelExplainer:
         outer_batch_size, inner_batch_size = self._configure_batch_sizes(
             outer_batch_size=outer_batch_size,
             inner_batch_size=inner_batch_size,
-            data=data
+            data=data,
         )
         n_background_rows = self.background_data[background_fold_to_use].shape[0]
 
@@ -525,26 +528,25 @@ class KernelExplainer:
             self.output_dim,
         )
         # 5 because:
-            # masked data
-            # masked data complement
-            # repeated data
-            # repeated data view to insert
-            # masked data copy while inserting
+        # masked data
+        # masked data complement
+        # repeated data
+        # repeated data view to insert
+        # masked data copy while inserting
         model_eval_sets_size = (
             inner_batch_size * n_background_rows * 5,
-            self.num_columns
+            self.num_columns,
         )
 
         return mask_matrix_size, linear_target_size, model_eval_sets_size
 
-
     def get_theoretical_minimum_memory_requirements(
-            self,
-            data,
-            outer_batch_size=None,
-            inner_batch_size=None,
-            n_coalition_sizes=3,
-            background_fold_to_use=None,
+        self,
+        data,
+        outer_batch_size=None,
+        inner_batch_size=None,
+        n_coalition_sizes=3,
+        background_fold_to_use=None,
     ):
         """
         Returns the expected memory requirements of each of the following major arrays in GB:
@@ -588,24 +590,32 @@ class KernelExplainer:
         (
             mask_matrix_size,
             linear_target_size,
-            inner_model_eval_set_size
+            inner_model_eval_set_size,
         ) = self.get_theoretical_array_expansion_sizes(
             data,
             outer_batch_size,
             inner_batch_size,
             n_coalition_sizes,
-            background_fold_to_use
+            background_fold_to_use,
         )
 
         bytes_per_item = self.return_type.itemsize
-        mask_matrix_GB = np.dtype("int8").itemsize * (np.product(mask_matrix_size) / _BYTES_PER_GIGABYTE)
-        linear_targets_GB = bytes_per_item * (np.product(linear_target_size) / _BYTES_PER_GIGABYTE)
+        mask_matrix_GB = np.dtype("int8").itemsize * (
+            np.product(mask_matrix_size) / _BYTES_PER_GIGABYTE
+        )
+        linear_targets_GB = bytes_per_item * (
+            np.product(linear_target_size) / _BYTES_PER_GIGABYTE
+        )
 
         if isinstance(self.background_data[0], pd_DataFrame):
             row_byte_size = np.sum([dt.itemsize for dt in self.dtypes.values()])
-            eval_set_GB = row_byte_size * (inner_model_eval_set_size[0] / _BYTES_PER_GIGABYTE)
+            eval_set_GB = row_byte_size * (
+                inner_model_eval_set_size[0] / _BYTES_PER_GIGABYTE
+            )
         elif isinstance(self.background_data[0], np.ndarray):
-            eval_set_GB = bytes_per_item * (np.product(inner_model_eval_set_size) / _BYTES_PER_GIGABYTE)
+            eval_set_GB = bytes_per_item * (
+                np.product(inner_model_eval_set_size) / _BYTES_PER_GIGABYTE
+            )
         else:
             raise ValueError("Unknown dataset type")
 

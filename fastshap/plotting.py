@@ -1,9 +1,14 @@
 # TODO:
-    # Code is a mess because categorical variables
-    # for numpy arrays was initially supported. Clean up.
+# Code is a mess because categorical variables
+# for numpy arrays was initially supported. Clean up.
 
 from .compat import pd_DataFrame, _view_pd, _view_np, _to_numpy
-from .utils import _get_variable_name_index, _safe_isnan, _fill_missing_cat, _keep_top_n_cats_unique
+from .utils import (
+    _get_variable_name_index,
+    _safe_isnan,
+    _fill_missing_cat,
+    _keep_top_n_cats_unique,
+)
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from matplotlib.colors import LinearSegmentedColormap
@@ -24,7 +29,7 @@ def __preprocess_data(data, variable):
         data_context = "pd_DataFrame"
         col_names = data.columns.tolist()
         catvars = {
-            col_names.index(col): data[col].dtype.name in  {"category", "object"}
+            col_names.index(col): data[col].dtype.name in {"category", "object"}
             for col in col_names
         }
 
@@ -34,10 +39,7 @@ def __preprocess_data(data, variable):
         data_context = "np_array"
         _view = _view_np
         # Do not support categorical variables for numpy arrays
-        catvars = {
-            col: False
-            for col in range(num_columns)
-        }
+        catvars = {col: False for col in range(num_columns)}
 
     else:
         raise ValueError("data not recognized.")
@@ -47,11 +49,7 @@ def __preprocess_data(data, variable):
     return data_context, num_rows, num_columns, var_name, var_index, catvars, _view
 
 
-def __determine_plotting_context(
-        shap_values,
-        output_index,
-        interaction_variable
-    ):
+def __determine_plotting_context(shap_values, output_index, interaction_variable):
     """
     There are 12 different plotting scenarios:
         Multiclass plotting of numeric variable shap values
@@ -77,26 +75,21 @@ def __determine_plotting_context(
             output_index = [i for i in range(shap_values.shape[2])]
         elif isinstance(output_index, int):
             output_index = [output_index]
-        assert isinstance(output_index, list), (
-            "output_index must be an int or list of ints. If it is None, all classes are plotted."
-        )
+        assert isinstance(
+            output_index, list
+        ), "output_index must be an int or list of ints. If it is None, all classes are plotted."
         # If only 1 output dimension is being plotted, we can treat it like a standard
         # single output variable, and allow interaction plotting.
         if len(output_index) > 1:
-            assert interaction_variable == "auto" or interaction_variable is None, (
-                "interaction_variable cannot be specified if plotting multiple output dimensions"
-            )
+            assert (
+                interaction_variable == "auto" or interaction_variable is None
+            ), "interaction_variable cannot be specified if plotting multiple output dimensions"
             multiclass = True
 
     return multiclass, interact, find_interaction, output_index
 
 
-def get_variable_interactions(
-        shap_values,
-        data,
-        variable,
-        interaction_bins=5
-):
+def get_variable_interactions(shap_values, data, variable, interaction_bins=5):
     """
     Returns an array representing the weighted average of each variables ability
     to explain the variance (r-square) in the shap values of our variable of interest
@@ -111,10 +104,15 @@ def get_variable_interactions(
     :param num_var_bins:
     :return:
     """
-    data_context, num_rows, num_columns, var_name, var_index, catvars, _view = __preprocess_data(
-        data,
-        variable
-    )
+    (
+        data_context,
+        num_rows,
+        num_columns,
+        var_name,
+        var_index,
+        catvars,
+        _view,
+    ) = __preprocess_data(data, variable)
     linreg = LinearRegression(fit_intercept=True)
     variable_values = _view(data, (slice(None), var_index))
     variable_shap_values = shap_values[:, var_index]
@@ -124,11 +122,7 @@ def get_variable_interactions(
     # If the variable is categorical, the bins will just be the top n categories.
     if catvars[var_index]:
         var_bins = _keep_top_n_cats_unique(
-            x=variable_values,
-            n=interaction_bins,
-            s="OTHER",
-            m="MISSING",
-            codes=True
+            x=variable_values, n=interaction_bins, s="OTHER", m="MISSING", codes=True
         ).values
 
     else:
@@ -138,10 +132,10 @@ def get_variable_interactions(
             np.unique(
                 np.nanpercentile(
                     variable_values,
-                    np.linspace(0, 100, interaction_bins, endpoint=False)[1:]
+                    np.linspace(0, 100, interaction_bins, endpoint=False)[1:],
                 )
             ),
-            right=True
+            right=True,
         )
         var_bins[~var_nan] = nona_bins
         var_bins[var_nan] = -1
@@ -149,7 +143,9 @@ def get_variable_interactions(
     bin_unq, bin_cnt = np.unique(var_bins, return_counts=True)
     min_bin_cnt = bin_cnt.min()
     if min_bin_cnt < 15:
-        warn(f"WARNING: Lowest bin count is {min_bin_cnt}. Consider lowering interaction_bins.")
+        warn(
+            f"WARNING: Lowest bin count is {min_bin_cnt}. Consider lowering interaction_bins."
+        )
     vbc = bin_cnt[np.argsort(bin_unq)] / bin_cnt.sum()
     bin_unq.sort()
 
@@ -188,7 +184,9 @@ def get_variable_interactions(
 
                 # See how well the piv explains the variance in the shap values in this bin.
                 linreg.fit(onehot, variable_shap_values[bin_ind])
-                piv_r_squares[piv] += linreg.score(onehot, variable_shap_values[bin_ind]) * vbc[i]
+                piv_r_squares[piv] += (
+                    linreg.score(onehot, variable_shap_values[bin_ind]) * vbc[i]
+                )
 
             else:
 
@@ -196,16 +194,24 @@ def get_variable_interactions(
 
                 # If there are enough missing data in the piv, give it it's own
                 # categorical indicator, otherwise just impute with mean.
-                if piv_bin_isnan.mean() > __NUMERIC_MISSING_PERCENT_IND_THRESHOLD or \
-                    piv_bin_isnan.sum() > __NUMERIC_MISSING_COUNT_IND_THRESHOLD:
+                if (
+                    piv_bin_isnan.mean() > __NUMERIC_MISSING_PERCENT_IND_THRESHOLD
+                    or piv_bin_isnan.sum() > __NUMERIC_MISSING_COUNT_IND_THRESHOLD
+                ):
                     piv_bin[piv_bin_isnan] = piv_nonan_mean
-                    lin_feat = np.concatenate([piv_bin, np.where(piv_bin_isnan, 1, 0)]).reshape(2, -1).transpose()
+                    lin_feat = (
+                        np.concatenate([piv_bin, np.where(piv_bin_isnan, 1, 0)])
+                        .reshape(2, -1)
+                        .transpose()
+                    )
                 else:
                     lin_feat = piv_bin.reshape(-1, 1)
                     lin_feat[piv_bin_isnan] = piv_nonan_mean
 
                 linreg.fit(lin_feat, variable_shap_values[bin_ind])
-                piv_r_squares[piv] += linreg.score(lin_feat, variable_shap_values[bin_ind]) * vbc[i]
+                piv_r_squares[piv] += (
+                    linreg.score(lin_feat, variable_shap_values[bin_ind]) * vbc[i]
+                )
 
         # Remove the value associated with the variable we are measuring interactions for.
         piv_r_squares = np.delete(piv_r_squares, var_index)
@@ -214,29 +220,38 @@ def get_variable_interactions(
 
 
 def plot_variable_effect_on_output(
-        shap_values,
-        data,
-        variable,
-        interaction_variable="auto",
-        interaction_bins=None,
-        output_index=None,
-        class_labels=None,
-        max_rows=10000,
-        max_cat_levels=5,
-        style_context="seaborn-deep",
-        cmap=None,
-        alpha=1.0,
-        plot_adjust_func=None
-    ):
-    assert data.shape[0] == shap_values.shape[0], "These shap values didn't come from this data."
-    assert data.shape[1] + 1 == shap_values.shape[1], "These shap values didn't come from this data."
-    data_context, num_rows, num_columns, var_name, var_index, catvars, _view = __preprocess_data(
-        data,
-        variable
-    )
+    shap_values,
+    data,
+    variable,
+    interaction_variable="auto",
+    interaction_bins=None,
+    output_index=None,
+    class_labels=None,
+    max_rows=10000,
+    max_cat_levels=5,
+    style_context="seaborn-deep",
+    cmap=None,
+    alpha=1.0,
+    plot_adjust_func=None,
+):
+    assert (
+        data.shape[0] == shap_values.shape[0]
+    ), "These shap values didn't come from this data."
+    assert (
+        data.shape[1] + 1 == shap_values.shape[1]
+    ), "These shap values didn't come from this data."
+    (
+        data_context,
+        num_rows,
+        num_columns,
+        var_name,
+        var_index,
+        catvars,
+        _view,
+    ) = __preprocess_data(data, variable)
 
     if cmap is None:
-        cmap = LinearSegmentedColormap.from_list("", ["royalblue","fuchsia"])
+        cmap = LinearSegmentedColormap.from_list("", ["royalblue", "fuchsia"])
 
     # Subset if we need to, can't get around copying here
     if num_rows > max_rows:
@@ -250,33 +265,32 @@ def plot_variable_effect_on_output(
         multiclass,
         interact,
         find_interaction,
-        output_index
+        output_index,
     ) = __determine_plotting_context(shap_values, output_index, interaction_variable)
 
     # Multiclass
     if multiclass:
 
-        sv = shap_values[:,var_index,output_index]
+        sv = shap_values[:, var_index, output_index]
         if class_labels is None:
             class_labels = [str(i) for i in output_index]
         else:
             assert len(class_labels) == len(output_index)
 
         if catvars[var_index]:
-            assert data_context == "pd_DataFrame", "Cannot plot categorical vars unless from pandas."
+            assert (
+                data_context == "pd_DataFrame"
+            ), "Cannot plot categorical vars unless from pandas."
             plot_df = pd_DataFrame(sv, columns=class_labels)
             plot_df[var_name] = var_values
             plot_df[var_name] = _keep_top_n_cats_unique(
-                plot_df[var_name],
-                max_cat_levels,
-                "OTHER",
-                "MISSING"
+                plot_df[var_name], max_cat_levels, "OTHER", "MISSING"
             )
             _plot_multi_with_cat_var(
                 var_name=var_name,
                 plot_df=plot_df,
                 style_context=style_context,
-                plot_adjust_func=plot_adjust_func
+                plot_adjust_func=plot_adjust_func,
             )
 
         else:
@@ -288,12 +302,11 @@ def plot_variable_effect_on_output(
                 class_labels=class_labels,
                 style_context=style_context,
                 cmap=cmap,
-                alpha=alpha
+                alpha=alpha,
             )
 
-
     else:
-        sv = shap_values[:,var_index]
+        sv = shap_values[:, var_index]
 
         if not interact:
             iv_values = None
@@ -312,11 +325,13 @@ def plot_variable_effect_on_output(
                     shap_values=shap_values,
                     data=data,
                     variable=variable,
-                    interaction_bins=interaction_bins
+                    interaction_bins=interaction_bins,
                 )
 
                 interaction_variable = interaction_vars[np.argmax(piv_r_squares)]
-                iv_name, iv_index = _get_variable_name_index(int(interaction_variable), data)
+                iv_name, iv_index = _get_variable_name_index(
+                    int(interaction_variable), data
+                )
 
             else:
                 iv_name, iv_index = _get_variable_name_index(interaction_variable, data)
@@ -325,25 +340,20 @@ def plot_variable_effect_on_output(
             iv_cat = catvars[iv_index]
 
         if catvars[var_index]:
-            assert data_context == "pd_DataFrame", "Cannot plot categorical variables unless from pandas."
-            plot_df = pd_DataFrame({
-                var_name: var_values,
-                f"{var_name} SHAP Values": sv
-            })
+            assert (
+                data_context == "pd_DataFrame"
+            ), "Cannot plot categorical variables unless from pandas."
+            plot_df = pd_DataFrame(
+                {var_name: var_values, f"{var_name} SHAP Values": sv}
+            )
             plot_df[var_name] = _keep_top_n_cats_unique(
-                plot_df[var_name],
-                max_cat_levels,
-                "OTHER",
-                "MISSING"
+                plot_df[var_name], max_cat_levels, "OTHER", "MISSING"
             )
             if interact:
                 plot_df[iv_name] = iv_values
                 if iv_cat:
                     plot_df[iv_name] = _keep_top_n_cats_unique(
-                        plot_df[iv_name],
-                        max_cat_levels,
-                        "OTHER",
-                        "MISSING"
+                        plot_df[iv_name], max_cat_levels, "OTHER", "MISSING"
                     )
             _plot_cat_var_shap_values(
                 var_name=var_name,
@@ -353,7 +363,7 @@ def plot_variable_effect_on_output(
                 cmap=cmap,
                 alpha=alpha,
                 style_context=style_context,
-                plot_adjust_func=plot_adjust_func
+                plot_adjust_func=plot_adjust_func,
             )
 
         else:
@@ -369,21 +379,22 @@ def plot_variable_effect_on_output(
                 cmap=cmap,
                 alpha=alpha,
                 style_context=style_context,
-                plot_adjust_func=plot_adjust_func
+                plot_adjust_func=plot_adjust_func,
             )
 
 
 def _plot_multi_with_num_var(
-        var_name,
-        var_values,
-        sv,
-        output_index,
-        class_labels,
-        style_context,
-        cmap,
-        alpha,
+    var_name,
+    var_values,
+    sv,
+    output_index,
+    class_labels,
+    style_context,
+    cmap,
+    alpha,
 ):
     from matplotlib import pyplot as plt
+
     with plt.style.context(style_context):
         for oi in range(len(output_index)):
             cl = class_labels[oi]
@@ -394,7 +405,7 @@ def _plot_multi_with_num_var(
                 label=cl,
                 marker=".",
                 cmap=cmap,
-                alpha=alpha
+                alpha=alpha,
             )
         plt.legend(title="Class")
         plt.xlabel(var_name)
@@ -402,20 +413,11 @@ def _plot_multi_with_num_var(
         plt.title("Dependence Plot")
 
 
-def _plot_multi_with_cat_var(
-        var_name,
-        plot_df,
-        style_context,
-        plot_adjust_func
-):
+def _plot_multi_with_cat_var(var_name, plot_df, style_context, plot_adjust_func):
     from matplotlib import pyplot as plt
+
     with plt.style.context(style_context):
-        axes = plot_df.boxplot(
-            by=var_name,
-            layout=(1,-1),
-            return_type='axes',
-            rot=45
-        )
+        axes = plot_df.boxplot(by=var_name, layout=(1, -1), return_type="axes", rot=45)
         axes.iloc[0].set_ylabel(f"{var_name} \n SHAP Values")
         fig = axes[0].get_figure()
         fig.suptitle("Dependence Plot")
@@ -424,14 +426,7 @@ def _plot_multi_with_cat_var(
 
 
 def _plot_cat_var_shap_values(
-        var_name,
-        iv_name,
-        plot_df,
-        iv_cat,
-        cmap,
-        alpha,
-        style_context,
-        plot_adjust_func
+    var_name, iv_name, plot_df, iv_cat, cmap, alpha, style_context, plot_adjust_func
 ):
     plot_interaction = iv_name is not None
 
@@ -439,45 +434,26 @@ def _plot_cat_var_shap_values(
 
         if iv_cat:
             _plot_cat_var_w_cat_iv(
-                var_name,
-                iv_name,
-                plot_df,
-                style_context,
-                plot_adjust_func
+                var_name, iv_name, plot_df, style_context, plot_adjust_func
             )
         else:
             _plot_cat_var_w_num_iv(
-                var_name,
-                iv_name,
-                plot_df,
-                cmap,
-                alpha,
-                style_context,
-                plot_adjust_func
+                var_name, iv_name, plot_df, cmap, alpha, style_context, plot_adjust_func
             )
     else:
-        _plot_cat_var_wo_iv(
-            var_name,
-            plot_df,
-            style_context,
-            plot_adjust_func
-        )
+        _plot_cat_var_wo_iv(var_name, plot_df, style_context, plot_adjust_func)
 
 
 def _plot_cat_var_wo_iv(
-        var_name,
-        plot_df,
-        style_context,
-        plot_adjust_func,
+    var_name,
+    plot_df,
+    style_context,
+    plot_adjust_func,
 ):
     from matplotlib import pyplot as plt
+
     with plt.style.context(style_context):
-        axes = plot_df.boxplot(
-            by=var_name,
-            layout=(1,-1),
-            return_type='axes',
-            rot=45
-        )
+        axes = plot_df.boxplot(by=var_name, layout=(1, -1), return_type="axes", rot=45)
         axes.iloc[0].set_ylabel(f"{var_name} \n SHAP Values")
         fig = axes[0].get_figure()
         fig.suptitle("Dependence Plot")
@@ -486,20 +462,12 @@ def _plot_cat_var_wo_iv(
             plot_adjust_func(plt, fig, axes)
 
 
-def _plot_cat_var_w_cat_iv(
-        var_name,
-        iv_name,
-        plot_df,
-        style_context,
-        plot_adjust_func
-):
+def _plot_cat_var_w_cat_iv(var_name, iv_name, plot_df, style_context, plot_adjust_func):
     from matplotlib import pyplot as plt
+
     with plt.style.context(style_context):
         axes = plot_df.groupby(iv_name).boxplot(
-            by=var_name,
-            layout=(1,-1),
-            return_type='axes',
-            rot=45
+            by=var_name, layout=(1, -1), return_type="axes", rot=45
         )
         axes[0][0].set_ylabel(f"{var_name} \n SHAP Values")
         fig = axes[0][0].get_figure()
@@ -509,16 +477,11 @@ def _plot_cat_var_w_cat_iv(
 
 
 def _plot_cat_var_w_num_iv(
-        var_name,
-        iv_name,
-        plot_df,
-        cmap,
-        alpha,
-        style_context,
-        plot_adjust_func
+    var_name, iv_name, plot_df, cmap, alpha, style_context, plot_adjust_func
 ):
     sv_name = f"{var_name} SHAP Values"
     from matplotlib import pyplot as plt
+
     with plt.style.context(style_context):
         # cmap = plt.get_cmap(cmap)
         groups = plot_df.groupby(var_name)
@@ -530,7 +493,7 @@ def _plot_cat_var_w_num_iv(
                 marker=".",
                 s=__DOT_SIZE,
                 # cmap=cmap,
-                alpha=alpha
+                alpha=alpha,
             )
         # produce a legend with the unique colors from the scatter
         plt.legend(title=var_name)
@@ -541,19 +504,20 @@ def _plot_cat_var_w_num_iv(
         if plot_adjust_func is not None:
             plot_adjust_func(plt)
 
+
 def _plot_numeric_var_shap_values(
-        data_context,
-        var_name,
-        var_values,
-        sv,
-        iv_name,
-        iv_values,
-        iv_cat,
-        max_cat_levels,
-        cmap,
-        alpha,
-        style_context,
-        plot_adjust_func
+    data_context,
+    var_name,
+    var_values,
+    sv,
+    iv_name,
+    iv_values,
+    iv_cat,
+    max_cat_levels,
+    cmap,
+    alpha,
+    style_context,
+    plot_adjust_func,
 ):
     # Variable values are unknown. These might not exist
     var_nan = _safe_isnan(var_values)
@@ -566,17 +530,18 @@ def _plot_numeric_var_shap_values(
         iv_nan = _safe_isnan(iv_values)
 
         if iv_cat:
-            assert data_context == "pd_DataFrame", "iv is categorical, but data is not pandas."
-            plot_df = pd_DataFrame({
-                var_name: var_values,
-                iv_name: iv_values,
-                f"{var_name} SHAP Values": sv
-            })
+            assert (
+                data_context == "pd_DataFrame"
+            ), "iv is categorical, but data is not pandas."
+            plot_df = pd_DataFrame(
+                {
+                    var_name: var_values,
+                    iv_name: iv_values,
+                    f"{var_name} SHAP Values": sv,
+                }
+            )
             plot_df[iv_name] = _keep_top_n_cats_unique(
-                plot_df[iv_name],
-                max_cat_levels,
-                "OTHER",
-                "MISSING"
+                plot_df[iv_name], max_cat_levels, "OTHER", "MISSING"
             )
             _plot_num_var_w_cat_iv(
                 var_name=var_name,
@@ -586,7 +551,7 @@ def _plot_numeric_var_shap_values(
                 cmap=cmap,
                 alpha=alpha,
                 style_context=style_context,
-                plot_adjust_func=plot_adjust_func
+                plot_adjust_func=plot_adjust_func,
             )
 
         else:
@@ -618,7 +583,7 @@ def _plot_numeric_var_shap_values(
                 cmap=cmap,
                 alpha=alpha,
                 style_context=style_context,
-                plot_adjust_func=plot_adjust_func
+                plot_adjust_func=plot_adjust_func,
             )
 
     else:
@@ -632,24 +597,24 @@ def _plot_numeric_var_shap_values(
             sideplot_sv=sideplot_sv,
             alpha=alpha,
             style_context=style_context,
-            plot_adjust_func=plot_adjust_func
+            plot_adjust_func=plot_adjust_func,
         )
 
 
 def _plot_num_var_w_num_iv(
-        var_name,
-        iv_name,
-        sctrplt_cc_var,
-        sctrplt_cc_iv,
-        sctrplt_cc_sv,
-        plot_missing_color,
-        sctrplt_ivnan_var,
-        sctrplt_ivnan_sv,
-        sideplot_sv,
-        cmap,
-        alpha,
-        style_context,
-        plot_adjust_func
+    var_name,
+    iv_name,
+    sctrplt_cc_var,
+    sctrplt_cc_iv,
+    sctrplt_cc_sv,
+    plot_missing_color,
+    sctrplt_ivnan_var,
+    sctrplt_ivnan_sv,
+    sideplot_sv,
+    cmap,
+    alpha,
+    style_context,
+    plot_adjust_func,
 ):
     plot_sideplot = len(sideplot_sv) > 5
 
@@ -662,6 +627,7 @@ def _plot_num_var_w_num_iv(
 
     from matplotlib import pyplot as plt
     from matplotlib.cm import ScalarMappable
+
     with plt.style.context(style_context):
         cmap = plt.get_cmap(cmap)
         norm = plt.Normalize(sctrplt_cc_sv.min(), sctrplt_cc_sv.max())
@@ -672,7 +638,7 @@ def _plot_num_var_w_num_iv(
             sharey=True,
             gridspec_kw=dict(
                 width_ratios=width_ratios,
-            )
+            ),
         )
         axs = axs if plot_sideplot else [axs]
         axs[0].scatter(
@@ -682,7 +648,7 @@ def _plot_num_var_w_num_iv(
             marker=".",
             s=__DOT_SIZE,
             cmap=cmap,
-            alpha=alpha
+            alpha=alpha,
         )
         clb = fig.colorbar(sm, ax=axs[0], pad=0.0)
         clb.ax.set_title(iv_name, fontsize=10)
@@ -696,14 +662,12 @@ def _plot_num_var_w_num_iv(
                 color="black",
                 marker="x",
                 alpha=alpha,
-                s=__MISSING_X_SIZE
+                s=__MISSING_X_SIZE,
             )
         axs[0].set_title("Dependence Plot", fontsize=14)
 
         if plot_sideplot:
-            axs[1].violinplot(
-                dataset=sideplot_sv
-            )
+            axs[1].violinplot(dataset=sideplot_sv)
             axs[1].set_title(f"Missing \n {var_name}", fontsize=10)
 
         if plot_adjust_func is not None:
@@ -713,14 +677,14 @@ def _plot_num_var_w_num_iv(
 
 
 def _plot_num_var_w_cat_iv(
-        var_name,
-        iv_name,
-        plot_df,
-        sideplot_sv,
-        cmap,
-        alpha,
-        style_context,
-        plot_adjust_func
+    var_name,
+    iv_name,
+    plot_df,
+    sideplot_sv,
+    cmap,
+    alpha,
+    style_context,
+    plot_adjust_func,
 ):
     plot_sideplot = len(sideplot_sv) > 5
     sv_name = f"{var_name} SHAP Values"
@@ -733,6 +697,7 @@ def _plot_num_var_w_cat_iv(
         width_ratios = [1]
 
     from matplotlib import pyplot as plt
+
     with plt.style.context(style_context):
         # cmap = plt.get_cmap(cmap)
         fig, axs = plt.subplots(
@@ -743,7 +708,7 @@ def _plot_num_var_w_cat_iv(
                 width_ratios=width_ratios,
                 # wspace=0.1,
                 # hspace=0.1,
-            )
+            ),
         )
         axs = axs if plot_sideplot else [axs]
         groups = plot_df.groupby(iv_name)
@@ -755,7 +720,7 @@ def _plot_num_var_w_cat_iv(
                 marker=".",
                 s=__DOT_SIZE,
                 # cmap=cmap,
-                alpha=alpha
+                alpha=alpha,
             )
         # produce a legend with the unique colors from the scatter
         axs[0].legend(title=iv_name)
@@ -764,9 +729,7 @@ def _plot_num_var_w_cat_iv(
         axs[0].title.set_text("Dependence Plot")
 
         if plot_sideplot:
-            axs[1].violinplot(
-                dataset=sideplot_sv
-            )
+            axs[1].violinplot(dataset=sideplot_sv)
             axs[1].set_title(f"Missing \n {var_name}", fontsize=10)
 
         if plot_adjust_func is not None:
@@ -776,13 +739,13 @@ def _plot_num_var_w_cat_iv(
 
 
 def _plot_num_var_wo_iv(
-        var_name,
-        sctrplt_cc_var,
-        sctrplt_cc_sv,
-        sideplot_sv,
-        alpha,
-        style_context,
-        plot_adjust_func
+    var_name,
+    sctrplt_cc_var,
+    sctrplt_cc_sv,
+    sideplot_sv,
+    alpha,
+    style_context,
+    plot_adjust_func,
 ):
 
     plot_sideplot = len(sideplot_sv) > 5
@@ -795,6 +758,7 @@ def _plot_num_var_wo_iv(
         width_ratios = [1]
 
     from matplotlib import pyplot as plt
+
     with plt.style.context(style_context):
         fig, axs = plt.subplots(
             nrows=1,
@@ -804,24 +768,18 @@ def _plot_num_var_wo_iv(
                 width_ratios=width_ratios,
                 # wspace=0.1,
                 # hspace=0.1,
-            )
+            ),
         )
         axs = axs if plot_sideplot else [axs]
         axs[0].scatter(
-            x=sctrplt_cc_var,
-            y=sctrplt_cc_sv,
-            marker="o",
-            s=__DOT_SIZE,
-            alpha=alpha
+            x=sctrplt_cc_var, y=sctrplt_cc_sv, marker="o", s=__DOT_SIZE, alpha=alpha
         )
         axs[0].set_xlabel(var_name)
         axs[0].set_ylabel(f"SHAP values \n {var_name}")
         axs[0].title.set_text("Dependence Plot")
 
         if plot_sideplot:
-            axs[1].violinplot(
-                dataset=sideplot_sv
-            )
+            axs[1].violinplot(dataset=sideplot_sv)
             axs[1].set_title(f"Missing \n {var_name}", fontsize=10)
 
         if plot_adjust_func is not None:
