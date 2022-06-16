@@ -1,6 +1,6 @@
 
-[![Build
-Status](https://app.travis-ci.com/AnotherSamWilson/fastshap.svg?branch=main)](https://app.travis-ci.com/github/AnotherSamWilson/fastshap)
+<!-- [![Build Status](https://app.travis-ci.com/AnotherSamWilson/fastshap.svg?branch=main)](https://app.travis-ci.com/github/AnotherSamWilson/fastshap) -->
+
 [![CodeCov](https://codecov.io/gh/AnotherSamWilson/fastshap/branch/master/graphs/badge.svg?branch=master&service=github)](https://codecov.io/gh/AnotherSamWilson/fastshap)
 
 ## fastshap: A fast, approximate shap kernel
