@@ -1,7 +1,6 @@
-from .compat import pd_DataFrame, pd_Series, _to_numpy
+from .compat import pd_DataFrame, pd_Series, _to_numpy, _repeat, _tile
 import numpy as np
 from itertools import combinations
-from datetime import datetime as dt
 from scipy.special import binom
 from sklearn.linear_model import LinearRegression
 from .utils import (
@@ -62,12 +61,12 @@ class KernelExplainer:
     def calculate_shap_values(
         self,
         data,
-        outer_batch_size=100,
-        inner_batch_size=10,
+        outer_batch_size=None,
+        inner_batch_size=None,
         n_coalition_sizes=3,
         background_fold_to_use=None,
         linear_model=None,
-        verbose=True,
+        verbose=False,
     ):
         """
         Calculates approximate shap values for data.
@@ -166,6 +165,11 @@ class KernelExplainer:
         num_new_samples = data.shape[0]
         col_array = np.arange(self.num_columns)
         n_background_rows = working_background_data.shape[0]
+        outer_batch_size, inner_batch_size = self._configure_batch_sizes(
+            outer_batch_size=outer_batch_size,
+            inner_batch_size=inner_batch_size,
+            data=data
+        )
         index = np.arange(num_new_samples)
         outer_batches = [
             index[i : np.min([i + outer_batch_size, index[-1] + 1])]
@@ -229,10 +233,6 @@ class KernelExplainer:
         )
         selected_coalition_size_weights /= selected_coalition_size_weights.sum()
 
-        self.insert_times = []
-        self.func_eval_times = []
-        if isinstance(data, pd_DataFrame):
-            self.convert_to_pd_times = []
         for outer_batch in outer_batches:
             # outer_batch = outer_batches[0]
             logger.log(f"Starting Samples {outer_batch[0]} - {outer_batch[-1]}")
@@ -253,14 +253,14 @@ class KernelExplainer:
                 slice(outer_batch[0] + i, outer_batch[0] + i + inner_batch_size)
                 for i in range(0, outer_batch_length, inner_batch_size)
             ]
+            inner_batch_count = len(inner_batches_absolute)
 
             for coalition_size in range(1, coalition_sizes_to_combinate + 1):
-
                 # coalition_size = 1
-
-                logger.log(f"Coalition Size {str(coalition_size)}")
                 has_complement = coalition_size <= symmetric_sizes_to_combinate
                 choose_count = binom(self.num_columns, coalition_size).astype("int32")
+                model_evals = inner_batch_count * (choose_count * 2 + inner_batch_count)
+                logger.log(f"Coalition Size: {str(coalition_size)} - Model Evaluations: {model_evals}")
                 inds = combinations(np.arange(self.num_columns), coalition_size)
                 listinds = [list(i) for i in inds]
                 coalition_weight = (
@@ -281,25 +281,25 @@ class KernelExplainer:
                     mask_matrix[coalition_c_loc] = 1 - mask_matrix[coalition_loc]
                     coalition_weights[coalition_c_loc] = coalition_weight
 
-                for inner_batch_i in range(len(inner_batches_absolute)):
+                for inner_batch_i in range(inner_batch_count):
+                    # Inner loop is where things get expanded
                     # inner_batch_i = 0
                     slice_absolute = inner_batches_absolute[inner_batch_i]
                     slice_relative = inner_batches_relative[inner_batch_i]
                     inner_batch_size = len(
                         range(*slice_relative.indices(masked_coalition_avg.shape[1]))
                     )
-                    batch_data = self._view(data, (slice_absolute, slice(None)))
-                    repeated_batch_data = np.repeat(
-                        _to_numpy(batch_data).astype(self.return_type),
+
+                    repeated_batch_data = _repeat(
+                        self._view(data, (slice_absolute, slice(None))),
                         repeats=n_background_rows,
-                        axis=0,
+                        axis=0
                     )
 
                     # For each mask (and complement, if it is paired)
                     for coalition_i in range(choose_count):
-                        # coalition_i = 0
-                        masked_data = np.tile(
-                            _to_numpy(working_background_data).astype(self.return_type),
+                        masked_data = _tile(
+                            working_background_data,
                             (inner_batch_size, 1),
                         )
 
@@ -317,51 +317,21 @@ class KernelExplainer:
                         # Overwrite masked data with real batch data.
                         # Order of masked_data is mask, background, batch
                         # Broken up into possible slices for faster insertion
-                        s = dt.now()
                         for ms in mask_slices:
-
-                            masked_data[:, ms] = repeated_batch_data[:, ms]
+                            self._assign(
+                                masked_data,
+                                (slice(None), ms),
+                                self._view(repeated_batch_data, (slice(None), ms))
+                            )
 
                         if has_complement:
                             for msc in mask_c_slices:
-                                masked_data_complement[:, msc] = repeated_batch_data[
-                                    :, msc
-                                ]
-
-                        self.insert_times.append(dt.now() - s)
-
-                        # Coalitions are stored at the beginning of the array
-                        # Complements are stored at the opposite end.
-                        if isinstance(data, pd_DataFrame):
-                            s = dt.now()
-                            masked_data = self._concat(
-                                [
-                                    pd_Series(
-                                        masked_data[:, self.col_names.index(col)],
-                                        dtype=self.dtypes[col],
-                                        name=col,
-                                    )
-                                    for col in self.col_names
-                                ],
-                                axis=1,
-                            )
-                            if has_complement:
-                                masked_data_complement = self._concat(
-                                    [
-                                        pd_Series(
-                                            masked_data_complement[
-                                                :, self.col_names.index(col)
-                                            ],
-                                            dtype=self.dtypes[col],
-                                            name=col,
-                                        )
-                                        for col in self.col_names
-                                    ],
-                                    axis=1,
+                                self._assign(
+                                    masked_data_complement,
+                                    (slice(None), msc),
+                                    self._view(repeated_batch_data, (slice(None), msc))
                                 )
-                            self.convert_to_pd_times.append(dt.now() - s)
 
-                        s = dt.now()
                         masked_coalition_avg[
                             coalition_loc[coalition_i], slice_relative
                         ] = (
@@ -381,16 +351,19 @@ class KernelExplainer:
                                 )
                                 .mean(axis=1)
                             )
-                        self.func_eval_times.append((dt.now() - s))
+
+                # Clean up inner batch
+                del repeated_batch_data
+                del masked_data
+                if has_complement:
+                    del masked_data_complement
 
             # Back to outer batch
             mean_model_output = data_preds.mean(0)
             linear_features = mask_matrix[:, :-1] - mask_matrix[:, -1].reshape(-1, 1)
 
             for outer_batch_sample in range(outer_batch_length):
-                # outer_batch_sample = 0
                 for output_dimension in range(self.output_dim):
-                    # output_dimension = 0
                     linear_target = (
                         masked_coalition_avg[:, outer_batch_sample, output_dimension]
                         - mean_model_output[output_dimension]
@@ -422,6 +395,19 @@ class KernelExplainer:
             shap_values.resize(data.shape[0], data.shape[1] + 1)
 
         return shap_values
+
+    def _configure_batch_sizes(
+            self,
+            outer_batch_size,
+            inner_batch_size,
+            data
+    ):
+        n_rows = data.shape[0]
+        outer_batch_size = n_rows if outer_batch_size is None else outer_batch_size
+        outer_batch_size = n_rows if outer_batch_size > n_rows else outer_batch_size
+        inner_batch_size = outer_batch_size if inner_batch_size is None else inner_batch_size
+        assert inner_batch_size <= outer_batch_size, "outer batch size < inner batch size"
+        return outer_batch_size, inner_batch_size
 
     def stratify_background_set(self, n_splits=10, output_dim_to_stratify=0):
         """
@@ -456,8 +442,9 @@ class KernelExplainer:
 
     def get_theoretical_array_expansion_sizes(
         self,
-        outer_batch_size=100,
-        inner_batch_size=10,
+        data,
+        outer_batch_size=None,
+        inner_batch_size=None,
         n_coalition_sizes=3,
         background_fold_to_use=None,
     ):
@@ -502,6 +489,13 @@ class KernelExplainer:
         else:
             background_fold_to_use = 0
 
+        outer_batch_size, inner_batch_size = self._configure_batch_sizes(
+            outer_batch_size=outer_batch_size,
+            inner_batch_size=inner_batch_size,
+            data=data
+        )
+        n_background_rows = self.background_data[background_fold_to_use].shape[0]
+
         n_choose_k_midpoint = (self.num_columns - 1) / 2.0
         coalition_sizes_to_combinate = np.min(
             [np.ceil(n_choose_k_midpoint), n_coalition_sizes]
@@ -530,27 +524,34 @@ class KernelExplainer:
             outer_batch_size,
             self.output_dim,
         )
-        inner_model_eval_set_size = (
-            inner_batch_size * self.background_data[background_fold_to_use].shape[0],
-            self.num_columns,
+        # 5 because:
+            # masked data
+            # masked data complement
+            # repeated data
+            # repeated data view to insert
+            # masked data copy while inserting
+        model_eval_sets_size = (
+            inner_batch_size * n_background_rows * 5,
+            self.num_columns
         )
 
-        return mask_matrix_size, linear_target_size, inner_model_eval_set_size
+        return mask_matrix_size, linear_target_size, model_eval_sets_size
 
 
     def get_theoretical_minimum_memory_requirements(
             self,
-            outer_batch_size=100,
-            inner_batch_size=10,
+            data,
+            outer_batch_size=None,
+            inner_batch_size=None,
             n_coalition_sizes=3,
             background_fold_to_use=None,
     ):
         """
-        Returns the expected size of each of the following major arrays in GB:
+        Returns the expected memory requirements of each of the following major arrays in GB:
 
             Mask Matrix (Global)
             Linear Features (Outer Batch)
-            Model Eval Set (Inner Batch)
+            Model Eval Sets (Inner Batch)
 
 
         Parameters
@@ -582,21 +583,30 @@ class KernelExplainer:
 
         """
 
+        _BYTES_PER_GIGABYTE = 1073741824
 
         (
             mask_matrix_size,
             linear_target_size,
             inner_model_eval_set_size
         ) = self.get_theoretical_array_expansion_sizes(
+            data,
             outer_batch_size,
             inner_batch_size,
             n_coalition_sizes,
-            background_fold_to_use,
+            background_fold_to_use
         )
 
         bytes_per_item = self.return_type.itemsize
-        mask_matrix_GB = np.dtype("int8").itemsize * (np.product(mask_matrix_size) / 1000000000)
-        linear_targets_GB = bytes_per_item * (np.product(linear_target_size) / 1000000000)
-        eval_set_GB = bytes_per_item * (np.product(inner_model_eval_set_size) / 1000000000)
+        mask_matrix_GB = np.dtype("int8").itemsize * (np.product(mask_matrix_size) / _BYTES_PER_GIGABYTE)
+        linear_targets_GB = bytes_per_item * (np.product(linear_target_size) / _BYTES_PER_GIGABYTE)
+
+        if isinstance(self.background_data[0], pd_DataFrame):
+            row_byte_size = np.sum([dt.itemsize for dt in self.dtypes.values()])
+            eval_set_GB = row_byte_size * (inner_model_eval_set_size[0] / _BYTES_PER_GIGABYTE)
+        elif isinstance(self.background_data[0], np.ndarray):
+            eval_set_GB = bytes_per_item * (np.product(inner_model_eval_set_size) / _BYTES_PER_GIGABYTE)
+        else:
+            raise ValueError("Unknown dataset type")
 
         return mask_matrix_GB, linear_targets_GB, eval_set_GB
