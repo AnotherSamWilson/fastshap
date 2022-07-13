@@ -97,12 +97,31 @@ def get_variable_interactions(shap_values, data, variable, interaction_bins=5):
     Variables with higher r-squares in this regard tend to have more interesting
     interactions with the variable of interest.
 
-    :param shap_values:
-    :param data:
-    :param variable:
-    :param categorical_variables:
-    :param num_var_bins:
-    :return:
+    :param shap_values: np.ndarray
+        The shap values
+
+    :param data: np.ndarray or pd.DataFrame
+        The original data that the shap values were calculated from
+
+    :param variable: int or str
+        The variable to calculate the interactions for.
+
+    :param interaction_bins: int
+        The number of bins to use to evaluate non-linear interactions
+        The more bins, the more accurately non-linear interactions can
+        be calculated, but there will be less data in each bin.
+
+    :return: list, list
+        Two lists. The first is the r-square values for the interaction variables.
+        The second are the indexes of the variables that were calculated.
+
+        For example, the following return:
+            [0.5, 0.6, 0.7], [0,1,3]
+
+        Variable 3 had the highest r-square with variable 2 over the interaction bins.
+        Variable 2 was the variable of interest, because it is missing from the list.
+
+
     """
     (
         data_context,
@@ -234,6 +253,59 @@ def plot_variable_effect_on_output(
     alpha=1.0,
     plot_adjust_func=None,
 ):
+    """
+    Plots the shap values of a specific variable. Will automatically
+    plot interactions between variables of different types. Capable
+    of plotting numeric and categorical data.
+
+    :param shap_values: np.ndarray
+        The shap values to plot
+
+    :param data: np.ndarray or pd.DataFrame
+        The data that was used to create the shap values
+
+    :param variable: str or int
+        The variable to plot.
+
+    :param interaction_variable: str or int or None
+        If "auto", the variable with the highest interaction
+        as calculated by get_variable_interactions will be plotted.
+        To not plot the interaction, set to None.
+
+    :param interaction_bins: int
+        Same as get_variable_interactions()
+
+    :param output_index: int or None
+        If multiclass, which class should be plotted?
+
+    :param class_labels: list[str]
+        The labels for the multiclass output, if applicable.
+
+    :param max_rows: int
+        Automatically cap the plotted points to this amount.
+
+    :param max_cat_levels: int
+        Automatically cap the maximum plotted categorical
+        classes to this amount.
+
+    :param style_context: str
+        Passed to plt.style.context(), easily changes the
+        style of the plot.
+
+    :param cmap: str
+        Passed to the cmap argument of matplotlib plotting
+        functions.
+
+    :param alpha:: float
+        Higher values make the points more transparent.
+
+    :param plot_adjust_func: callable
+        A user defined function that allows the user to adjust
+        the plot in any way they wish. The items passed to this
+        function depend on the type of plot called.
+
+    :return:
+    """
     assert (
         data.shape[0] == shap_values.shape[0]
     ), "These shap values didn't come from this data."
