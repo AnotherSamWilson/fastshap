@@ -28,6 +28,7 @@ fastshap_times = []
 shap_times = []
 row_list = []
 for ss in stratification_sizes:
+    ss = stratification_sizes[2]
     # Stratify the dataset into 200 (almost) equal sized sets.
     fastshap_ke.stratify_background_set(ss)
     background_rows = fastshap_ke.background_data[0].shape[0]
@@ -51,8 +52,11 @@ for ss in stratification_sizes:
     )
 
     s = dt.now()
-    shap_ke.shap_values(shap_data, nsamples=184)
+    shap_sv = shap_ke.shap_values(shap_data, nsamples=184)
     shap_times.append((dt.now() - s).total_seconds())
+
+fastshap_sv[:,:-1] / shap_sv
+
 
 
 import matplotlib.pyplot as plt
