@@ -232,10 +232,10 @@ def get_variable_interactions(shap_values, data, variable, interaction_bins=5):
                     linreg.score(lin_feat, variable_shap_values[bin_ind]) * vbc[i]
                 )
 
-        # Remove the value associated with the variable we are measuring interactions for.
-        piv_r_squares = np.delete(piv_r_squares, var_index)
+    # Remove the value associated with the variable we are measuring interactions for.
+    piv_r_squares = np.delete(piv_r_squares, var_index)
 
-        return piv_r_squares, potential_interaction_vars
+    return piv_r_squares, potential_interaction_vars
 
 
 def plot_variable_effect_on_output(
