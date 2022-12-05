@@ -14,7 +14,7 @@ setup(
     keywords=['shap', 'model explainability'],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    install_requires=['numpy','pandas', 'sklearn'],
+    install_requires=['numpy','pandas', 'scikit-learn'],
     url="https://github.com/AnotherSamWilson/fastshap",
     packages=find_packages(exclude=["tests.*", "tests"]),
     classifiers=[
